@@ -95,6 +95,10 @@ export const queryApi = {
   filterValues: (source, field) => api.get(`/query/filter-values/${source}/${field}`),
 };
 
+export const schemaApi = {
+  getSchema: () => api.get('/schema'),
+};
+
 export const reportsApi = {
   list: () => api.get('/reports'),
   get: (id) => api.get(`/reports/${id}`),

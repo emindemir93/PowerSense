@@ -34,6 +34,27 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    path: '/schema',
+    label: 'DB Schema',
+    adminOnly: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 7V4h16v3" /><path d="M9 20h6" /><path d="M12 4v16" />
+        <rect x="2" y="7" width="8" height="5" rx="1" /><rect x="14" y="7" width="8" height="5" rx="1" />
+      </svg>
+    ),
+  },
+  {
+    path: '/guide',
+    label: 'User Guide',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Layout() {
@@ -47,6 +68,10 @@ export default function Layout() {
     navigate('/login');
   };
 
+  const visibleItems = navItems.filter(
+    (item) => !item.adminOnly || user?.role === 'admin'
+  );
+
   return (
     <div className="app-layout">
       <aside className="sidebar">
@@ -54,7 +79,7 @@ export default function Layout() {
           P
         </div>
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
+          {visibleItems.map((item) => (
             <button
               key={item.path}
               className={`sidebar-item ${location.pathname.startsWith(item.path) ? 'active' : ''}`}

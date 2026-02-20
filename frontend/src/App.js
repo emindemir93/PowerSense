@@ -9,6 +9,8 @@ import BuilderPage from './pages/BuilderPage';
 import DataExplorerPage from './pages/DataExplorerPage';
 import ReportsPage from './pages/ReportsPage';
 import ReportBuilderPage from './pages/ReportBuilderPage';
+import SchemaViewerPage from './pages/SchemaViewerPage';
+import UserGuidePage from './pages/UserGuidePage';
 import ProfilePage from './pages/ProfilePage';
 
 const queryClient = new QueryClient({
@@ -40,6 +42,8 @@ export default function App() {
             <Route path="explore" element={<DataExplorerPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reports/:id" element={<ReportBuilderPage />} />
+            <Route path="schema" element={<SchemaViewerPage />} />
+            <Route path="guide" element={<UserGuidePage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboards" replace />} />
