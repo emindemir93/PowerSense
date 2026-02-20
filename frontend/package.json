@@ -12,6 +12,9 @@
     "react-router-dom": "^6.21.3",
     "react-scripts": "5.0.1",
     "recharts": "^2.12.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "xlsx": "^0.18.5",
     "zustand": "^4.5.0"
   },
   "scripts": {

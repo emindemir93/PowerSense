@@ -13,6 +13,22 @@ const AGG_OPTIONS = [
   { value: 'max', label: 'Max' },
 ];
 
+const COND_OPERATORS = [
+  { value: '>', label: '>' },
+  { value: '<', label: '<' },
+  { value: '>=', label: '>=' },
+  { value: '<=', label: '<=' },
+  { value: '=', label: '=' },
+];
+
+const COND_COLORS = [
+  { value: '#3fb950', label: 'Green' },
+  { value: '#f85149', label: 'Red' },
+  { value: '#d29922', label: 'Yellow' },
+  { value: '#4493f8', label: 'Blue' },
+  { value: '#f778ba', label: 'Pink' },
+];
+
 export default function WidgetConfigPanel({ widget, onClose }) {
   const updateWidget = useDashboardStore((s) => s.updateWidget);
 
@@ -22,9 +38,10 @@ export default function WidgetConfigPanel({ widget, onClose }) {
   const [dimensions, setDimensions] = useState(widget?.data_config?.dimensions || []);
   const [measures, setMeasures] = useState(widget?.data_config?.measures || []);
   const [limit, setLimit] = useState(widget?.data_config?.limit || 100);
-  const [colors, setColors] = useState(widget?.visual_config?.colors || []);
   const [format, setFormat] = useState(widget?.visual_config?.format || 'number');
   const [prefix, setPrefix] = useState(widget?.visual_config?.prefix || '');
+  const [slicerField, setSlicerField] = useState(widget?.data_config?.slicerField || '');
+  const [conditionalRules, setConditionalRules] = useState(widget?.visual_config?.conditionalRules || []);
 
   const { data: schema } = useQuery({
     queryKey: ['query-schema'],
@@ -39,15 +56,20 @@ export default function WidgetConfigPanel({ widget, onClose }) {
       setDimensions(widget.data_config?.dimensions || []);
       setMeasures(widget.data_config?.measures || []);
       setLimit(widget.data_config?.limit || 100);
-      setColors(widget.visual_config?.colors || []);
       setFormat(widget.visual_config?.format || 'number');
       setPrefix(widget.visual_config?.prefix || '');
+      setSlicerField(widget.data_config?.slicerField || '');
+      setConditionalRules(widget.visual_config?.conditionalRules || []);
     }
   }, [widget]);
 
   if (!widget) return null;
 
   const sourceSchema = schema?.[source];
+  const isSlicer = type === 'slicer';
+  const isKpi = type === 'kpi';
+  const isTable = type === 'table';
+  const showCondFormatting = isKpi || isTable;
 
   const applyChanges = () => {
     updateWidget(widget.id, {
@@ -58,14 +80,15 @@ export default function WidgetConfigPanel({ widget, onClose }) {
         dimensions,
         measures,
         limit: parseInt(limit) || 100,
+        ...(isSlicer && { slicerField }),
         ...(widget.data_config?.filters && { filters: widget.data_config.filters }),
         ...(widget.data_config?.sort && { sort: widget.data_config.sort }),
       },
       visual_config: {
         ...widget.visual_config,
-        colors: colors.length > 0 ? colors : undefined,
         format,
         prefix,
+        conditionalRules: conditionalRules.length > 0 ? conditionalRules : undefined,
       },
     });
   };
@@ -74,22 +97,22 @@ export default function WidgetConfigPanel({ widget, onClose }) {
     setSource(newSource);
     setDimensions([]);
     setMeasures([]);
+    setSlicerField('');
   };
 
   const toggleDimension = (dim) => {
-    setDimensions((prev) =>
-      prev.includes(dim) ? prev.filter((d) => d !== dim) : [...prev, dim]
-    );
+    setDimensions((prev) => prev.includes(dim) ? prev.filter((d) => d !== dim) : [...prev, dim]);
   };
 
   const addMeasure = () => {
-    const availableMeasures = sourceSchema?.measures || [];
-    if (availableMeasures.length > 0) {
-      setMeasures((prev) => [
-        ...prev,
-        { field: availableMeasures[0].key, aggregation: availableMeasures[0].defaultAgg, alias: availableMeasures[0].key },
-      ]);
+    const available = sourceSchema?.measures || [];
+    if (available.length > 0) {
+      setMeasures((prev) => [...prev, { field: available[0].key, aggregation: available[0].defaultAgg, alias: available[0].key }]);
     }
+  };
+
+  const addCalculatedField = () => {
+    setMeasures((prev) => [...prev, { type: 'calculated', alias: 'calc_field', expression: '{total_amount} / {order_count}' }]);
   };
 
   const updateMeasure = (index, updates) => {
@@ -98,6 +121,18 @@ export default function WidgetConfigPanel({ widget, onClose }) {
 
   const removeMeasure = (index) => {
     setMeasures((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addCondRule = () => {
+    setConditionalRules((prev) => [...prev, { operator: '>', value: '', color: '#3fb950' }]);
+  };
+
+  const updateCondRule = (index, updates) => {
+    setConditionalRules((prev) => prev.map((r, i) => (i === index ? { ...r, ...updates } : r)));
+  };
+
+  const removeCondRule = (index) => {
+    setConditionalRules((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -112,6 +147,7 @@ export default function WidgetConfigPanel({ widget, onClose }) {
       </div>
 
       <div className="config-panel-body">
+        {/* General */}
         <div className="config-section">
           <div className="config-section-title">General</div>
           <div className="form-group">
@@ -121,38 +157,44 @@ export default function WidgetConfigPanel({ widget, onClose }) {
           <div className="form-group">
             <label className="form-label">Chart Type</label>
             <select className="form-select" value={type} onChange={(e) => setType(e.target.value)}>
-              {WIDGET_TYPES.map((t) => (
-                <option key={t.type} value={t.type}>{t.label}</option>
-              ))}
+              {WIDGET_TYPES.map((t) => (<option key={t.type} value={t.type}>{t.label}</option>))}
             </select>
           </div>
         </div>
 
+        {/* Data Source */}
         <div className="config-section">
           <div className="config-section-title">Data Source</div>
           <div className="form-group">
-            <label className="form-label">Source</label>
             <select className="form-select" value={source} onChange={(e) => handleSourceChange(e.target.value)}>
               <option value="">Select a data source...</option>
-              {schema && Object.entries(schema).map(([key, val]) => (
-                <option key={key} value={key}>{val.label}</option>
-              ))}
+              {schema && Object.entries(schema).map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
             </select>
           </div>
         </div>
 
-        {sourceSchema && (
+        {/* Slicer Config */}
+        {isSlicer && sourceSchema && (
+          <div className="config-section">
+            <div className="config-section-title">Slicer Field</div>
+            <div className="form-group">
+              <select className="form-select" value={slicerField} onChange={(e) => setSlicerField(e.target.value)}>
+                <option value="">Select filter field...</option>
+                {sourceSchema.dimensions.map((dim) => (<option key={dim.key} value={dim.key}>{dim.label}</option>))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Dimensions & Measures for non-slicer */}
+        {!isSlicer && sourceSchema && (
           <>
             <div className="config-section">
               <div className="config-section-title">Dimensions (Group By)</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {sourceSchema.dimensions.map((dim) => (
                   <label key={dim.key} className="form-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={dimensions.includes(dim.key)}
-                      onChange={() => toggleDimension(dim.key)}
-                    />
+                    <input type="checkbox" checked={dimensions.includes(dim.key)} onChange={() => toggleDimension(dim.key)} />
                     {dim.label}
                   </label>
                 ))}
@@ -163,39 +205,47 @@ export default function WidgetConfigPanel({ widget, onClose }) {
               <div className="config-section-title">
                 Measures
                 <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '2px 8px' }} onClick={addMeasure}>+ Add</button>
+                <button className="btn btn-ghost btn-sm" style={{ marginLeft: 4, padding: '2px 8px', color: 'var(--purple)' }} onClick={addCalculatedField} title="Add Calculated Field">fx</button>
               </div>
               {measures.map((m, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'flex-end' }}>
-                  <div style={{ flex: 1 }}>
-                    <select className="form-select" value={m.field} onChange={(e) => updateMeasure(i, { field: e.target.value, alias: e.target.value })}>
-                      {sourceSchema.measures.map((sm) => (
-                        <option key={sm.key} value={sm.key}>{sm.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <select className="form-select" value={m.aggregation} onChange={(e) => updateMeasure(i, { aggregation: e.target.value })}>
-                      {AGG_OPTIONS.map((a) => (
-                        <option key={a.value} value={a.value}>{a.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    className="btn btn-ghost btn-icon btn-sm"
-                    onClick={() => removeMeasure(i)}
-                    style={{ color: 'var(--danger)', flexShrink: 0 }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
+                <div key={i} style={{ marginBottom: 8 }}>
+                  {m.type === 'calculated' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 8, background: 'var(--bg-elevated)', borderRadius: 6, border: '1px solid var(--purple-soft, #30363d)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--purple, #a371f7)' }}>CALCULATED FIELD</span>
+                        <button className="btn btn-ghost btn-icon btn-sm" onClick={() => removeMeasure(i)} style={{ color: 'var(--danger)' }}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                        </button>
+                      </div>
+                      <input className="form-input" placeholder="Alias" value={m.alias} onChange={(e) => updateMeasure(i, { alias: e.target.value })} style={{ fontSize: 11 }} />
+                      <input className="form-input" placeholder="e.g. {total_amount} / {order_count}" value={m.expression || ''} onChange={(e) => updateMeasure(i, { expression: e.target.value })} style={{ fontSize: 11, fontFamily: 'monospace' }} />
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Use {'{field_name}'} to reference measures</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1 }}>
+                        <select className="form-select" value={m.field} onChange={(e) => updateMeasure(i, { field: e.target.value, alias: e.target.value })}>
+                          {sourceSchema.measures.map((sm) => (<option key={sm.key} value={sm.key}>{sm.label}</option>))}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <select className="form-select" value={m.aggregation} onChange={(e) => updateMeasure(i, { aggregation: e.target.value })}>
+                          {AGG_OPTIONS.map((a) => (<option key={a.value} value={a.value}>{a.label}</option>))}
+                        </select>
+                      </div>
+                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => removeMeasure(i)} style={{ color: 'var(--danger)', flexShrink: 0 }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </>
         )}
 
-        {type === 'kpi' && (
+        {/* KPI Display */}
+        {isKpi && (
           <div className="config-section">
             <div className="config-section-title">KPI Display</div>
             <div className="form-group">
@@ -213,13 +263,45 @@ export default function WidgetConfigPanel({ widget, onClose }) {
           </div>
         )}
 
-        <div className="config-section">
-          <div className="config-section-title">Options</div>
-          <div className="form-group">
-            <label className="form-label">Row Limit</label>
-            <input className="form-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} min={1} max={10000} />
+        {/* Conditional Formatting */}
+        {showCondFormatting && (
+          <div className="config-section">
+            <div className="config-section-title">
+              Conditional Formatting
+              <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '2px 8px' }} onClick={addCondRule}>+ Rule</button>
+            </div>
+            {conditionalRules.map((rule, i) => (
+              <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>If value</span>
+                <select className="form-select" value={rule.operator} onChange={(e) => updateCondRule(i, { operator: e.target.value })} style={{ width: 50 }}>
+                  {COND_OPERATORS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                </select>
+                <input className="form-input" type="number" value={rule.value} onChange={(e) => updateCondRule(i, { value: e.target.value })} style={{ width: 70 }} placeholder="value" />
+                <select className="form-select" value={rule.color} onChange={(e) => updateCondRule(i, { color: e.target.value })} style={{ width: 80 }}>
+                  {COND_COLORS.map((c) => (<option key={c.value} value={c.value}>{c.label}</option>))}
+                </select>
+                <div style={{ width: 12, height: 12, borderRadius: 2, background: rule.color, flexShrink: 0 }} />
+                <button className="btn btn-ghost btn-icon btn-sm" onClick={() => removeCondRule(i)} style={{ color: 'var(--danger)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+              </div>
+            ))}
+            {conditionalRules.length === 0 && (
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Add rules to change value colors based on thresholds</p>
+            )}
           </div>
-        </div>
+        )}
+
+        {/* Options */}
+        {!isSlicer && (
+          <div className="config-section">
+            <div className="config-section-title">Options</div>
+            <div className="form-group">
+              <label className="form-label">Row Limit</label>
+              <input className="form-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} min={1} max={10000} />
+            </div>
+          </div>
+        )}
 
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={applyChanges}>
           Apply Changes

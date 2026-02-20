@@ -14,7 +14,22 @@ export const WIDGET_TYPES = [
   { type: 'donut', label: 'Donut Chart', icon: 'donut', defaultSize: { w: 4, h: 5 } },
   { type: 'scatter', label: 'Scatter Plot', icon: 'scatter', defaultSize: { w: 6, h: 5 } },
   { type: 'table', label: 'Data Table', icon: 'table', defaultSize: { w: 6, h: 5 } },
+  { type: 'slicer', label: 'Slicer (Filter)', icon: 'slicer', defaultSize: { w: 3, h: 4 } },
 ];
+
+export const DRILL_HIERARCHIES = {
+  orders: {
+    geo: ['region', 'customer_city', 'customer_name'],
+    time: ['year', 'quarter', 'month'],
+    product: ['category', 'product'],
+  },
+  customers: {
+    geo: ['region', 'city', 'name'],
+  },
+  products: {
+    product: ['category', 'name'],
+  },
+};
 
 export function formatNumber(value, format, prefix = '', suffix = '') {
   if (value === null || value === undefined) return '-';
@@ -23,25 +38,16 @@ export function formatNumber(value, format, prefix = '', suffix = '') {
 
   let formatted;
   if (format === 'currency') {
-    if (num >= 1e6) {
-      formatted = (num / 1e6).toFixed(1) + 'M';
-    } else if (num >= 1e3) {
-      formatted = (num / 1e3).toFixed(1) + 'K';
-    } else {
-      formatted = num.toFixed(2);
-    }
+    if (num >= 1e6) formatted = (num / 1e6).toFixed(1) + 'M';
+    else if (num >= 1e3) formatted = (num / 1e3).toFixed(1) + 'K';
+    else formatted = num.toFixed(2);
   } else if (format === 'percentage') {
     formatted = num.toFixed(1) + '%';
   } else {
-    if (num >= 1e6) {
-      formatted = (num / 1e6).toFixed(1) + 'M';
-    } else if (num >= 1e3) {
-      formatted = (num / 1e3).toFixed(1) + 'K';
-    } else if (Number.isInteger(num)) {
-      formatted = num.toLocaleString();
-    } else {
-      formatted = num.toFixed(2);
-    }
+    if (num >= 1e6) formatted = (num / 1e6).toFixed(1) + 'M';
+    else if (num >= 1e3) formatted = (num / 1e3).toFixed(1) + 'K';
+    else if (Number.isInteger(num)) formatted = num.toLocaleString();
+    else formatted = num.toFixed(2);
   }
 
   return `${prefix}${formatted}${suffix}`;
@@ -61,7 +67,7 @@ export function truncateLabel(label, maxLen = 20) {
   return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
 }
 
-export function buildQueryPayload(dataConfig, crossFilters = []) {
+export function buildQueryPayload(dataConfig, crossFilters = [], dateRange = null) {
   if (!dataConfig || !dataConfig.source) return null;
 
   const payload = {
@@ -86,12 +92,47 @@ export function buildQueryPayload(dataConfig, crossFilters = []) {
     }
   }
 
+  if (dateRange && dateRange.from) payload.filters.date_from = dateRange.from;
+  if (dateRange && dateRange.to) payload.filters.date_to = dateRange.to;
+
   return payload;
 }
 
 export function isWidgetConfigured(widget) {
+  if (widget?.type === 'slicer') {
+    const dc = widget?.data_config;
+    return dc?.source && dc?.slicerField;
+  }
   const dc = widget?.data_config;
   if (!dc || !dc.source) return false;
   if ((!dc.dimensions || dc.dimensions.length === 0) && (!dc.measures || dc.measures.length === 0)) return false;
   return true;
+}
+
+export function getConditionalColor(value, rules) {
+  if (!rules || rules.length === 0 || value === null || value === undefined) return null;
+  const num = parseFloat(value);
+  if (isNaN(num)) return null;
+  for (const rule of rules) {
+    const threshold = parseFloat(rule.value);
+    if (isNaN(threshold)) continue;
+    if (rule.operator === '<' && num < threshold) return rule.color;
+    if (rule.operator === '>' && num > threshold) return rule.color;
+    if (rule.operator === '<=' && num <= threshold) return rule.color;
+    if (rule.operator === '>=' && num >= threshold) return rule.color;
+    if (rule.operator === '=' && num === threshold) return rule.color;
+  }
+  return null;
+}
+
+export function getDrillHierarchy(source, currentDimension) {
+  const hierarchies = DRILL_HIERARCHIES[source];
+  if (!hierarchies) return null;
+  for (const [, chain] of Object.entries(hierarchies)) {
+    const idx = chain.indexOf(currentDimension);
+    if (idx >= 0 && idx < chain.length - 1) {
+      return { next: chain[idx + 1], chain, currentIndex: idx };
+    }
+  }
+  return null;
 }

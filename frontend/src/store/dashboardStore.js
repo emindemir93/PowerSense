@@ -6,6 +6,8 @@ export const useDashboardStore = create((set) => ({
   editMode: false,
   selectedWidgetId: null,
   crossFilters: [],
+  dateRange: { from: '', to: '' },
+  drillStates: {},
   showAddWidget: false,
 
   setDashboard: (dashboard) => set({
@@ -17,6 +19,8 @@ export const useDashboardStore = create((set) => ({
       position: typeof w.position === 'string' ? JSON.parse(w.position) : w.position,
     })),
     crossFilters: [],
+    dateRange: { from: '', to: '' },
+    drillStates: {},
     selectedWidgetId: null,
   }),
 
@@ -83,12 +87,68 @@ export const useDashboardStore = create((set) => ({
 
   clearCrossFilters: () => set({ crossFilters: [] }),
 
+  setDateRange: (dateRange) => set({ dateRange }),
+
+  drillDown: (widgetId, dimension, filterField, filterValue) => set((state) => ({
+    drillStates: {
+      ...state.drillStates,
+      [widgetId]: {
+        dimension,
+        filters: {
+          ...(state.drillStates[widgetId]?.filters || {}),
+          [filterField]: filterValue,
+        },
+        history: [
+          ...(state.drillStates[widgetId]?.history || []),
+          { dimension: state.drillStates[widgetId]?.dimension || null, filters: state.drillStates[widgetId]?.filters || {} },
+        ],
+      },
+    },
+  })),
+
+  drillUp: (widgetId) => set((state) => {
+    const ds = state.drillStates[widgetId];
+    if (!ds?.history?.length) {
+      const newStates = { ...state.drillStates };
+      delete newStates[widgetId];
+      return { drillStates: newStates };
+    }
+    const prev = ds.history[ds.history.length - 1];
+    return {
+      drillStates: {
+        ...state.drillStates,
+        [widgetId]: {
+          dimension: prev.dimension,
+          filters: prev.filters,
+          history: ds.history.slice(0, -1),
+        },
+      },
+    };
+  }),
+
+  resetDrill: (widgetId) => set((state) => {
+    const newStates = { ...state.drillStates };
+    delete newStates[widgetId];
+    return { drillStates: newStates };
+  }),
+
+  applyBookmark: (bookmark) => set({
+    crossFilters: typeof bookmark.filters_state === 'string'
+      ? JSON.parse(bookmark.filters_state)
+      : (bookmark.filters_state || []),
+    dateRange: typeof bookmark.date_range === 'string'
+      ? JSON.parse(bookmark.date_range)
+      : (bookmark.date_range || { from: '', to: '' }),
+  }),
+
   reset: () => set({
     dashboard: null,
     widgets: [],
     editMode: false,
     selectedWidgetId: null,
     crossFilters: [],
+    dateRange: { from: '', to: '' },
+    drillStates: {},
     showAddWidget: false,
   }),
 }));

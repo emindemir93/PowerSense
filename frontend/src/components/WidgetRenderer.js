@@ -5,17 +5,10 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { CHART_COLORS, formatNumber, formatAxisValue, truncateLabel } from '../utils/helpers';
+import { CHART_COLORS, formatNumber, formatAxisValue, truncateLabel, getConditionalColor } from '../utils/helpers';
 
 const TOOLTIP_STYLE = {
-  contentStyle: {
-    background: '#21262d',
-    border: '1px solid #30363d',
-    borderRadius: 6,
-    fontSize: 12,
-    color: '#e6edf3',
-    padding: '8px 12px',
-  },
+  contentStyle: { background: '#21262d', border: '1px solid #30363d', borderRadius: 6, fontSize: 12, color: '#e6edf3', padding: '8px 12px' },
   itemStyle: { color: '#e6edf3' },
   labelStyle: { color: '#8b949e', marginBottom: 4 },
 };
@@ -26,37 +19,15 @@ const AXIS_STYLE = {
   tickLine: false,
 };
 
-function getDimensionKey(widget) {
-  return widget.data_config?.dimensions?.[0] || 'dim_0';
-}
-
-function getMeasureKeys(widget) {
-  return (widget.data_config?.measures || []).map(
-    (m, i) => m.alias || `measure_${i}`
-  );
-}
-
-function getMeasureLabels(widget) {
-  return (widget.data_config?.measures || []).map(
-    (m) => m.alias || m.field || 'Value'
-  );
-}
-
-function getColors(widget) {
-  return widget.visual_config?.colors || CHART_COLORS;
-}
+function getDimensionKey(widget) { return widget.data_config?.dimensions?.[0] || 'dim_0'; }
+function getMeasureKeys(widget) { return (widget.data_config?.measures || []).map((m, i) => m.alias || `measure_${i}`); }
+function getMeasureLabels(widget) { return (widget.data_config?.measures || []).map((m) => m.alias || m.field || 'Value'); }
+function getColors(widget) { return widget.visual_config?.colors || CHART_COLORS; }
 
 export default function WidgetRenderer({ widget, data, loading, onCrossFilter, activeCrossFilter }) {
-  if (loading) {
-    return <div className="loading-spinner" />;
-  }
-
+  if (loading) return <div className="loading-spinner" />;
   if (!data || data.length === 0) {
-    return (
-      <div className="empty-state" style={{ padding: 16 }}>
-        <p style={{ fontSize: 12 }}>No data available</p>
-      </div>
-    );
+    return <div className="empty-state" style={{ padding: 16 }}><p style={{ fontSize: 12 }}>No data available</p></div>;
   }
 
   switch (widget.type) {
@@ -69,17 +40,18 @@ export default function WidgetRenderer({ widget, data, loading, onCrossFilter, a
     case 'donut': return <PieChartWidget widget={widget} data={data} onCrossFilter={onCrossFilter} innerRadius="60%" />;
     case 'scatter': return <ScatterChartWidget widget={widget} data={data} />;
     case 'table': return <TableWidget widget={widget} data={data} />;
-    default: return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Unknown chart type: {widget.type}</div>;
+    default: return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Unknown: {widget.type}</div>;
   }
 }
 
 function KPIWidget({ widget, data }) {
   const vc = widget.visual_config || {};
   const value = data?.[0] ? Object.values(data[0]).find((v) => typeof v === 'number') ?? Object.values(data[0])[0] : 0;
+  const condColor = getConditionalColor(value, vc.conditionalRules);
 
   return (
     <div className="kpi-widget">
-      <div className="kpi-value" style={{ color: vc.color || 'var(--accent)' }}>
+      <div className="kpi-value" style={{ color: condColor || vc.color || 'var(--accent)' }}>
         {formatNumber(value, vc.format, vc.prefix, vc.suffix)}
       </div>
       <div className="kpi-label">{widget.title}</div>
@@ -92,11 +64,7 @@ function BarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
   const colors = getColors(widget);
-
-  const chartData = useMemo(() =>
-    data.map((d) => ({ ...d, name: truncateLabel(d[dimKey], 16) })),
-    [data, dimKey]
-  );
+  const chartData = useMemo(() => data.map((d) => ({ ...d, name: truncateLabel(d[dimKey], 16) })), [data, dimKey]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -107,16 +75,8 @@ function BarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
         <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
         {measureKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#8b949e' }} />}
         {measureKeys.map((key, i) => (
-          <Bar
-            key={key}
-            dataKey={key}
-            name={measureLabels[i]}
-            fill={colors[i % colors.length]}
-            radius={[3, 3, 0, 0]}
-            cursor="pointer"
-            onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d[dimKey])}
-            opacity={activeCrossFilter ? 0.4 : 1}
-          >
+          <Bar key={key} dataKey={key} name={measureLabels[i]} fill={colors[i % colors.length]} radius={[3, 3, 0, 0]} cursor="pointer"
+            onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d[dimKey])} opacity={activeCrossFilter ? 0.4 : 1}>
             {activeCrossFilter && chartData.map((entry, idx) => (
               <Cell key={idx} opacity={entry[dimKey] === activeCrossFilter.value ? 1 : 0.4} />
             ))}
@@ -132,11 +92,7 @@ function HBarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
   const colors = getColors(widget);
-
-  const chartData = useMemo(() =>
-    data.map((d) => ({ ...d, name: truncateLabel(d[dimKey], 20) })),
-    [data, dimKey]
-  );
+  const chartData = useMemo(() => data.map((d) => ({ ...d, name: truncateLabel(d[dimKey], 20) })), [data, dimKey]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -146,16 +102,8 @@ function HBarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
         <YAxis type="category" dataKey="name" {...AXIS_STYLE} width={100} />
         <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
         {measureKeys.map((key, i) => (
-          <Bar
-            key={key}
-            dataKey={key}
-            name={measureLabels[i]}
-            fill={colors[i % colors.length]}
-            radius={[0, 3, 3, 0]}
-            cursor="pointer"
-            onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d[dimKey])}
-            opacity={activeCrossFilter ? 0.4 : 1}
-          >
+          <Bar key={key} dataKey={key} name={measureLabels[i]} fill={colors[i % colors.length]} radius={[0, 3, 3, 0]} cursor="pointer"
+            onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d[dimKey])} opacity={activeCrossFilter ? 0.4 : 1}>
             {activeCrossFilter && chartData.map((entry, idx) => (
               <Cell key={idx} opacity={entry[dimKey] === activeCrossFilter.value ? 1 : 0.4} />
             ))}
@@ -171,12 +119,7 @@ function LineChartWidget({ widget, data }) {
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
   const colors = getColors(widget);
-  const showDots = widget.visual_config?.showDots !== false;
-
-  const chartData = useMemo(() =>
-    data.map((d) => ({ ...d, name: d[dimKey] })),
-    [data, dimKey]
-  );
+  const chartData = useMemo(() => data.map((d) => ({ ...d, name: d[dimKey] })), [data, dimKey]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -187,16 +130,8 @@ function LineChartWidget({ widget, data }) {
         <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
         {measureKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#8b949e' }} />}
         {measureKeys.map((key, i) => (
-          <Line
-            key={key}
-            type="monotone"
-            dataKey={key}
-            name={measureLabels[i]}
-            stroke={colors[i % colors.length]}
-            strokeWidth={2}
-            dot={showDots ? { r: 3, fill: colors[i % colors.length] } : false}
-            activeDot={{ r: 5 }}
-          />
+          <Line key={key} type="monotone" dataKey={key} name={measureLabels[i]} stroke={colors[i % colors.length]} strokeWidth={2}
+            dot={{ r: 3, fill: colors[i % colors.length] }} activeDot={{ r: 5 }} />
         ))}
       </LineChart>
     </ResponsiveContainer>
@@ -208,11 +143,7 @@ function AreaChartWidget({ widget, data }) {
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
   const colors = getColors(widget);
-
-  const chartData = useMemo(() =>
-    data.map((d) => ({ ...d, name: d[dimKey] })),
-    [data, dimKey]
-  );
+  const chartData = useMemo(() => data.map((d) => ({ ...d, name: d[dimKey] })), [data, dimKey]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -231,15 +162,7 @@ function AreaChartWidget({ widget, data }) {
         <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
         {measureKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#8b949e' }} />}
         {measureKeys.map((key, i) => (
-          <Area
-            key={key}
-            type="monotone"
-            dataKey={key}
-            name={measureLabels[i]}
-            stroke={colors[i % colors.length]}
-            strokeWidth={2}
-            fill={`url(#grad-${key})`}
-          />
+          <Area key={key} type="monotone" dataKey={key} name={measureLabels[i]} stroke={colors[i % colors.length]} strokeWidth={2} fill={`url(#grad-${key})`} />
         ))}
       </AreaChart>
     </ResponsiveContainer>
@@ -250,39 +173,16 @@ function PieChartWidget({ widget, data, onCrossFilter, innerRadius = 0 }) {
   const dimKey = getDimensionKey(widget);
   const measureKeys = getMeasureKeys(widget);
   const colors = getColors(widget);
-
-  const chartData = useMemo(() =>
-    data.map((d) => ({
-      name: d[dimKey] || 'Unknown',
-      value: parseFloat(d[measureKeys[0]]) || 0,
-      rawDimValue: d[dimKey],
-    })),
-    [data, dimKey, measureKeys]
-  );
-
-  const renderLabel = ({ name, percent }) =>
-    `${truncateLabel(name, 12)} ${(percent * 100).toFixed(0)}%`;
+  const chartData = useMemo(() => data.map((d) => ({ name: d[dimKey] || 'Unknown', value: parseFloat(d[measureKeys[0]]) || 0, rawDimValue: d[dimKey] })), [data, dimKey, measureKeys]);
+  const renderLabel = ({ name, percent }) => `${truncateLabel(name, 12)} ${(percent * 100).toFixed(0)}%`;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
-        <Pie
-          data={chartData}
-          cx="50%"
-          cy="50%"
-          innerRadius={innerRadius}
-          outerRadius="80%"
-          paddingAngle={2}
-          dataKey="value"
-          label={widget.visual_config?.showLabels !== false ? renderLabel : false}
-          labelLine={false}
-          cursor="pointer"
-          onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d.rawDimValue)}
-          style={{ fontSize: 11, fill: '#8b949e' }}
-        >
-          {chartData.map((_, i) => (
-            <Cell key={i} fill={colors[i % colors.length]} />
-          ))}
+        <Pie data={chartData} cx="50%" cy="50%" innerRadius={innerRadius} outerRadius="80%" paddingAngle={2} dataKey="value"
+          label={widget.visual_config?.showLabels !== false ? renderLabel : false} labelLine={false} cursor="pointer"
+          onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d.rawDimValue)} style={{ fontSize: 11, fill: '#8b949e' }}>
+          {chartData.map((_, i) => (<Cell key={i} fill={colors[i % colors.length]} />))}
         </Pie>
         <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
       </PieChart>
@@ -294,23 +194,15 @@ function ScatterChartWidget({ widget, data }) {
   const dims = widget.data_config?.dimensions || [];
   const measures = widget.data_config?.measures || [];
   const colors = getColors(widget);
-
   const xKey = measures.length >= 2 ? (measures[0].alias || 'measure_0') : '';
   const yKey = measures.length >= 2 ? (measures[1].alias || 'measure_1') : '';
   const dimKey = dims[0] || null;
-
   const chartData = useMemo(() => {
     if (!xKey || !yKey) return [];
-    return data.map((d) => ({
-      x: parseFloat(d[xKey]) || 0,
-      y: parseFloat(d[yKey]) || 0,
-      name: dimKey ? d[dimKey] : '',
-    }));
+    return data.map((d) => ({ x: parseFloat(d[xKey]) || 0, y: parseFloat(d[yKey]) || 0, name: dimKey ? d[dimKey] : '' }));
   }, [data, xKey, yKey, dimKey]);
 
-  if (measures.length < 2) {
-    return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>Scatter plot requires at least 2 measures</div>;
-  }
+  if (measures.length < 2) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>Scatter requires 2+ measures</div>;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -320,9 +212,7 @@ function ScatterChartWidget({ widget, data }) {
         <YAxis type="number" dataKey="y" name={yKey} {...AXIS_STYLE} tickFormatter={formatAxisValue} width={50} />
         <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
         <Scatter data={chartData} fill={colors[0]}>
-          {chartData.map((_, i) => (
-            <Cell key={i} fill={colors[i % colors.length]} />
-          ))}
+          {chartData.map((_, i) => (<Cell key={i} fill={colors[i % colors.length]} />))}
         </Scatter>
       </ScatterChart>
     </ResponsiveContainer>
@@ -332,6 +222,7 @@ function ScatterChartWidget({ widget, data }) {
 function TableWidget({ widget, data }) {
   const dims = widget.data_config?.dimensions || [];
   const measures = widget.data_config?.measures || [];
+  const condRules = widget.visual_config?.conditionalRules || [];
 
   const columns = useMemo(() => {
     const cols = [];
@@ -347,20 +238,25 @@ function TableWidget({ widget, data }) {
     <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>
       <table className="widget-table">
         <thead>
-          <tr>
-            {columns.map((col) => (
-              <th key={col.key} style={{ textTransform: 'capitalize' }}>{col.label}</th>
-            ))}
-          </tr>
+          <tr>{columns.map((col) => (<th key={col.key} style={{ textTransform: 'capitalize' }}>{col.label}</th>))}</tr>
         </thead>
         <tbody>
           {data.map((row, i) => (
             <tr key={i}>
-              {columns.map((col) => (
-                <td key={col.key} style={{ textAlign: col.type === 'measure' ? 'right' : 'left', fontVariantNumeric: col.type === 'measure' ? 'tabular-nums' : undefined }}>
-                  {col.type === 'measure' ? formatAxisValue(row[col.key]) : (row[col.key] ?? '-')}
-                </td>
-              ))}
+              {columns.map((col) => {
+                const val = row[col.key];
+                const condColor = col.type === 'measure' ? getConditionalColor(val, condRules) : null;
+                return (
+                  <td key={col.key} style={{
+                    textAlign: col.type === 'measure' ? 'right' : 'left',
+                    fontVariantNumeric: col.type === 'measure' ? 'tabular-nums' : undefined,
+                    color: condColor || undefined,
+                    fontWeight: condColor ? 600 : undefined,
+                  }}>
+                    {col.type === 'measure' ? formatAxisValue(val) : (val ?? '-')}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

@@ -135,6 +135,7 @@ router.post('/', authenticate, authorize('admin', 'analyst', 'viewer'), async (r
     }
 
     for (const m of measures) {
+      if (m.type === 'calculated') continue;
       const mc = schema.measures[m.field];
       if (!mc) return res.status(400).json({ success: false, message: `Invalid measure: ${m.field}` });
       if (mc.join) addJoinWithDeps(schema, mc.join, requiredJoins);
@@ -162,10 +163,18 @@ router.post('/', authenticate, authorize('admin', 'analyst', 'viewer'), async (r
       groupParts.push(dc.expr);
     });
 
+    const calcFields = [];
     measures.forEach((m, i) => {
-      const mc = schema.measures[m.field];
-      const agg = m.aggregation || mc.defaultAgg;
       const alias = m.alias || `measure_${i}`;
+
+      if (m.type === 'calculated' && m.expression) {
+        calcFields.push({ alias, expression: m.expression });
+        return;
+      }
+
+      const mc = schema.measures[m.field];
+      if (!mc) return;
+      const agg = m.aggregation || mc.defaultAgg;
       const expr = mc.expr;
 
       const aggMap = {
@@ -220,9 +229,21 @@ router.post('/', authenticate, authorize('admin', 'analyst', 'viewer'), async (r
       const mapped = {};
       dimensions.forEach((dim, i) => { mapped[dim] = row[`dim_${i}`]; });
       measures.forEach((m, i) => {
+        if (m.type === 'calculated') return;
         const alias = m.alias || `measure_${i}`;
         mapped[alias] = parseFloat(row[alias]) || 0;
       });
+      for (const cf of calcFields) {
+        try {
+          const expr = cf.expression.replace(/\{(\w+)\}/g, (_, key) => {
+            const val = mapped[key];
+            return val !== undefined ? val : 0;
+          });
+          const safeExpr = expr.replace(/[^0-9+\-*/().%\s]/g, '');
+          mapped[cf.alias] = Function('"use strict"; return (' + safeExpr + ')')();
+          if (!isFinite(mapped[cf.alias])) mapped[cf.alias] = 0;
+        } catch { mapped[cf.alias] = 0; }
+      }
       return mapped;
     });
 

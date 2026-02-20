@@ -99,6 +99,12 @@ export const schemaApi = {
   getSchema: () => api.get('/schema'),
 };
 
+export const bookmarksApi = {
+  list: (dashboardId) => api.get(`/bookmarks/${dashboardId}`),
+  create: (data) => api.post('/bookmarks', data),
+  delete: (id) => api.delete(`/bookmarks/${id}`),
+};
+
 export const reportsApi = {
   list: () => api.get('/reports'),
   get: (id) => api.get(`/reports/${id}`),

@@ -96,6 +96,49 @@ const sections = [
         subtitle: 'Kaydetme',
         text: 'Değişikliklerinizi "Save" butonuyla kaydedin. Kaydetmeden çıkarsanız değişiklikler kaybolur.',
       },
+      {
+        subtitle: 'Slicer (Filtre Widget\'ı)',
+        text: 'Widget eklerken "Slicer (Filter)" tipini seçerek dashboard üzerinde bir filtre widget\'ı oluşturabilirsiniz.',
+        list: [
+          'Slicer, bir veri kaynağındaki boyut değerlerini liste olarak gösterir',
+          'Listedeki bir veya birden fazla değere tıklayarak dashboard\'daki tüm widget\'ları filtreleyebilirsiniz',
+          'Arama kutusu ile değerler arasında arama yapabilirsiniz',
+          '"Clear" butonu ile seçimleri temizleyebilirsiniz',
+        ],
+      },
+      {
+        subtitle: 'Tarih Aralığı Filtresi',
+        text: 'Dashboard araç çubuğunun altındaki filtre çubuğunda tarih aralığı seçicisi bulunur. Başlangıç ve bitiş tarihi seçerek tüm widget\'ları tarih aralığına göre filtreleyebilirsiniz. X butonu ile tarih filtresini kaldırabilirsiniz.',
+      },
+      {
+        subtitle: 'Drill-Down (Detaya İnme)',
+        text: 'Grafikler üzerinde detaya inme özelliği mevcuttur. Widget başlığında "DRILL" etiketi görüyorsanız, grafikteki bir değere tıklayarak daha detaylı verilere ulaşabilirsiniz.',
+        list: [
+          'Örneğin: Bölge → Şehir → Müşteri (coğrafi hiyerarşi)',
+          'Yıl → Çeyrek → Ay (zaman hiyerarşisi)',
+          'Kategori → Ürün (ürün hiyerarşisi)',
+          'Yukarı ok (↑) ile bir üst seviyeye dönebilirsiniz',
+          'Sıfırla butonu ile başlangıç seviyesine dönebilirsiniz',
+        ],
+      },
+      {
+        subtitle: 'Bookmarks (Yer İmleri)',
+        text: 'Mevcut filtre durumunuzu (cross-filter + tarih aralığı) kaydedebilirsiniz:',
+        list: [
+          'Araç çubuğundaki "Bookmarks" butonuna tıklayın',
+          'İsim girin ve "Save" ile kaydedin',
+          'Kaydedilmiş bookmark\'a tıklayarak o filtre durumuna geri dönebilirsiniz',
+          'Farklı senaryoları hızlıca karşılaştırmak için idealdir',
+        ],
+      },
+      {
+        subtitle: 'PDF ve Excel Export',
+        text: 'Dashboard\'u dışa aktarabilirsiniz:',
+        list: [
+          'PDF — Dashboard\'un görsel bir anlık görüntüsünü PDF olarak indirir',
+          'Excel — Her widget\'ın verisini ayrı bir sayfa olarak .xlsx dosyasına aktarır',
+        ],
+      },
     ],
   },
   {
@@ -236,7 +279,26 @@ const sections = [
       },
       {
         subtitle: 'Widget',
-        text: 'Dashboard üzerindeki her bir görselleştirme bileşeni. KPI kartı, çubuk grafik, çizgi grafik, pasta grafik gibi farklı tipleri vardır.',
+        text: 'Dashboard üzerindeki her bir görselleştirme bileşeni. KPI kartı, çubuk grafik, çizgi grafik, pasta grafik, slicer gibi farklı tipleri vardır.',
+      },
+      {
+        subtitle: 'Hesaplanmış Alan (Calculated Field)',
+        text: 'Widget konfigürasyonunda "fx" butonuna tıklayarak kendi hesaplanmış ölçünüzü tanımlayabilirsiniz. Diğer ölçülerin alias\'larını süslü parantez içinde referans verin:',
+        list: [
+          'Örnek: {total_amount} / {order_count} — Sipariş başına ortalama gelir',
+          'Örnek: {total_amount} - {discount_amount} — Net gelir',
+          'Desteklenen operatörler: +, -, *, /, ()',
+        ],
+      },
+      {
+        subtitle: 'Koşullu Biçimlendirme (Conditional Formatting)',
+        text: 'KPI ve Tablo widget\'larında değerlerin rengini kurallara göre otomatik değiştirebilirsiniz:',
+        list: [
+          'Widget konfigürasyonunda "Conditional Formatting" bölümünden "+ Rule" ile kural ekleyin',
+          'Operatör seçin (>, <, >=, <=, =) ve eşik değeri girin',
+          'Renk seçin (Yeşil, Kırmızı, Sarı, Mavi, Pembe)',
+          'Örnek: Değer > 100000 ise Yeşil, Değer < 10000 ise Kırmızı',
+        ],
       },
     ],
   },
