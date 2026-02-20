@@ -24,6 +24,7 @@ const bookmarksRoutes = require('./routes/bookmarks.routes');
 const commentsRoutes = require('./routes/comments.routes');
 const alertsRoutes = require('./routes/alerts.routes');
 const sqlRoutes = require('./routes/sql.routes');
+const connectionsRoutes = require('./routes/connections.routes');
 const auditRoutes = require('./routes/audit.routes');
 
 const app = express();
@@ -101,6 +102,7 @@ app.use('/api/bookmarks', bookmarksRoutes);
 app.use('/api/comments', commentsRoutes);
 app.use('/api/alerts', alertsRoutes);
 app.use('/api/sql', sqlRoutes);
+app.use('/api/connections', connectionsRoutes);
 app.use('/api/audit', auditRoutes);
 
 app.use((req, res) => {

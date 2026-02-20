@@ -11,6 +11,7 @@ import ReportsPage from './pages/ReportsPage';
 import ReportBuilderPage from './pages/ReportBuilderPage';
 import SchemaViewerPage from './pages/SchemaViewerPage';
 import SQLEditorPage from './pages/SQLEditorPage';
+import ConnectionsPage from './pages/ConnectionsPage';
 import UserGuidePage from './pages/UserGuidePage';
 import ProfilePage from './pages/ProfilePage';
 
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reports/:id" element={<ReportBuilderPage />} />
             <Route path="sql" element={<SQLEditorPage />} />
+            <Route path="connections" element={<ConnectionsPage />} />
             <Route path="schema" element={<SchemaViewerPage />} />
             <Route path="guide" element={<UserGuidePage />} />
             <Route path="profile" element={<ProfilePage />} />

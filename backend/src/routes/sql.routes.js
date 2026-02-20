@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db = require('../config/database');
+const { getConnection } = require('../config/connectionManager');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 const FORBIDDEN_PATTERNS = [
@@ -13,7 +14,7 @@ const QUERY_TIMEOUT = 30000;
 
 router.post('/execute', authenticate, authorize('admin', 'analyst'), async (req, res, next) => {
   try {
-    const { sql } = req.body;
+    const { sql, connectionId } = req.body;
     if (!sql || !sql.trim()) {
       return res.status(400).json({ success: false, message: 'SQL query is required' });
     }
@@ -36,10 +37,11 @@ router.post('/execute', authenticate, authorize('admin', 'analyst'), async (req,
       });
     }
 
+    const targetDb = await getConnection(connectionId);
     const wrappedSql = `SELECT * FROM (${trimmed}) AS __result LIMIT ${MAX_ROWS}`;
 
     const startTime = Date.now();
-    const result = await db.raw(wrappedSql).timeout(QUERY_TIMEOUT);
+    const result = await targetDb.raw(wrappedSql).timeout(QUERY_TIMEOUT);
     const elapsed = Date.now() - startTime;
 
     const rows = result.rows || [];
@@ -72,7 +74,9 @@ router.post('/execute', authenticate, authorize('admin', 'analyst'), async (req,
 
 router.get('/tables', authenticate, authorize('admin', 'analyst'), async (req, res, next) => {
   try {
-    const result = await db.raw(`
+    const connectionId = req.query.connectionId;
+    const targetDb = await getConnection(connectionId);
+    const result = await targetDb.raw(`
       SELECT
         t.table_name,
         array_agg(
@@ -93,7 +97,7 @@ router.get('/tables', authenticate, authorize('admin', 'analyst'), async (req, r
       ORDER BY t.table_name
     `);
 
-    const fkResult = await db.raw(`
+    const fkResult = await targetDb.raw(`
       SELECT
         tc.table_name AS from_table,
         kcu.column_name AS from_column,

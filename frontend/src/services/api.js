@@ -119,8 +119,19 @@ export const alertsApi = {
 };
 
 export const sqlApi = {
-  execute: (sql) => api.post('/sql/execute', { sql }),
-  tables: () => api.get('/sql/tables'),
+  execute: (sql, connectionId) => api.post('/sql/execute', { sql, connectionId }),
+  tables: (connectionId) => api.get('/sql/tables', { params: { connectionId } }),
+};
+
+export const connectionsApi = {
+  list: () => api.get('/connections'),
+  get: (id) => api.get(`/connections/${id}`),
+  create: (data) => api.post('/connections', data),
+  update: (id, data) => api.put(`/connections/${id}`, data),
+  delete: (id) => api.delete(`/connections/${id}`),
+  test: (id) => api.post(`/connections/${id}/test`),
+  testNew: (data) => api.post('/connections/test-new', data),
+  setDefault: (id) => api.post(`/connections/${id}/set-default`),
 };
 
 export const reportsApi = {

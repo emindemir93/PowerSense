@@ -245,6 +245,58 @@ const sections = [
     ],
   },
   {
+    id: 'connections',
+    title: 'Veritabanı Bağlantıları',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 20, height: 20 }}>
+        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+      </svg>
+    ),
+    content: [
+      {
+        subtitle: 'Bağlantı Yönetimi',
+        text: 'Admin kullanıcılar sol menüdeki "Connections" sekmesinden veritabanı bağlantılarını yönetebilir. BI araçları (SQL Editor, Dashboard sorguları, Schema Viewer) bu bağlantıları kullanır.',
+        list: [
+          '"New Connection" butonuna tıklayarak yeni bağlantı ekleyin',
+          'Bağlantı adı, host, port, veritabanı adı, kullanıcı adı ve şifre girin',
+          'Gerekirse SSL seçeneğini aktifleştirin',
+          '"Test Connection" ile bağlantının çalıştığını doğrulayın',
+          '"Create" ile bağlantıyı kaydedin',
+        ],
+      },
+      {
+        subtitle: 'Varsayılan Bağlantı',
+        text: 'Varsayılan (default) bağlantı, tüm BI sorguları için otomatik kullanılır:',
+        list: [
+          'Bağlantı kartındaki "Set Default" butonuyla varsayılan yapabilirsiniz',
+          'Bağlantı oluşturulurken "Set as default connection" seçeneğini işaretleyin',
+          'Varsayılan bağlantı mavi kenarlıkla ve DEFAULT etiketi ile gösterilir',
+          'Hiçbir bağlantı yoksa uygulama kendi dahili veritabanını kullanır',
+        ],
+      },
+      {
+        subtitle: 'Bağlantı Testi',
+        text: 'Bağlantıyı kaydetmeden önce veya sonra test edebilirsiniz:',
+        list: [
+          'Yeni bağlantı formunda "Test Connection" — kaydetmeden test eder',
+          'Mevcut bağlantı kartında "Test" — kaydedilmiş bağlantıyı test eder',
+          'Test başarılıysa: veritabanı versiyonu, kullanıcı bilgisi ve tablo sayısı gösterilir',
+          'Test başarısızsa: hata mesajı gösterilir (yanlış şifre, erişilemeyen host vb.)',
+          'Bağlantı durumu: connected (yeşil), failed (kırmızı), untested (gri)',
+        ],
+      },
+      {
+        subtitle: 'SQL Editor\'da Bağlantı Seçimi',
+        text: 'SQL Editor\'da admin kullanıcılar farklı bağlantılar arasında geçiş yapabilir:',
+        list: [
+          'SQL Editor toolbar\'ında bağlantı dropdown menüsünden seçim yapın',
+          'Bağlantı değiştiğinde Schema Browser otomatik güncellenir',
+          'Farklı veritabanlarına aynı anda sorgu yazabilirsiniz',
+        ],
+      },
+    ],
+  },
+  {
     id: 'sql-editor',
     title: 'SQL Editor',
     icon: (

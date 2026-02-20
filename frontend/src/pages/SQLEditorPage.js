@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { sqlApi } from '../services/api';
+import { sqlApi, connectionsApi } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import { formatAxisValue } from '../utils/helpers';
 
 const EXAMPLE_QUERIES = [
@@ -76,6 +77,8 @@ const SQL_KEYWORDS = [
 ];
 
 export default function SQLEditorPage() {
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
   const [sql, setSql] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -86,11 +89,20 @@ export default function SQLEditorPage() {
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const [selectedConnection, setSelectedConnection] = useState('');
   const textareaRef = useRef(null);
 
+  const { data: connections } = useQuery({
+    queryKey: ['connections'],
+    queryFn: () => connectionsApi.list().then((r) => r.data.data),
+    enabled: isAdmin,
+  });
+
+  const activeConnectionId = selectedConnection || undefined;
+
   const { data: tables } = useQuery({
-    queryKey: ['sql-tables'],
-    queryFn: () => sqlApi.tables().then((r) => r.data.data),
+    queryKey: ['sql-tables', activeConnectionId],
+    queryFn: () => sqlApi.tables(activeConnectionId).then((r) => r.data.data),
   });
 
   const executeQuery = useCallback(async () => {
@@ -99,7 +111,7 @@ export default function SQLEditorPage() {
     setError(null);
     setResult(null);
     try {
-      const res = await sqlApi.execute(sql.trim());
+      const res = await sqlApi.execute(sql.trim(), activeConnectionId);
       setResult(res.data.data);
       setHistory((prev) => {
         const entry = { sql: sql.trim(), time: new Date().toISOString(), rows: res.data.data.rowCount, elapsed: res.data.data.elapsed };
@@ -184,6 +196,27 @@ export default function SQLEditorPage() {
         </div>
 
         <div className="toolbar-actions" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Connection Selector */}
+          {isAdmin && connections && connections.length > 0 && (
+            <select
+              value={selectedConnection}
+              onChange={(e) => { setSelectedConnection(e.target.value); setResult(null); setError(null); }}
+              style={{
+                background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '4px 8px', color: 'var(--text-primary)',
+                fontSize: 11, maxWidth: 180,
+              }}
+              title="Select database connection"
+            >
+              <option value="">Default Connection</option>
+              {connections.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.is_default ? '(default)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
           <button className="btn btn-ghost btn-sm" onClick={() => setShowExamples(!showExamples)}
             style={{ position: 'relative' }}>
             Examples
