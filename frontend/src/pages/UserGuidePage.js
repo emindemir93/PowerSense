@@ -245,6 +245,79 @@ const sections = [
     ],
   },
   {
+    id: 'sql-editor',
+    title: 'SQL Editor',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 20, height: 20 }}>
+        <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+      </svg>
+    ),
+    content: [
+      {
+        subtitle: 'SQL Editor Nedir?',
+        text: 'SQL Editor, veritabanınıza doğrudan SQL sorguları yazmanızı sağlayan güçlü bir araçtır. JOIN, subquery, CTE (WITH), CROSS JOIN gibi karmaşık sorgular yazabilirsiniz. Güvenlik nedeniyle sadece SELECT sorguları çalıştırılabilir.',
+        list: [
+          'Sol menüden "SQL Editor" sekmesine tıklayın',
+          'Soldaki Schema Browser\'da tüm tabloları ve sütunları görebilirsiniz',
+          'Tablo/sütun isimlerine tıklayarak editöre otomatik ekleyebilirsiniz',
+          'Sorgunuzu yazıp Ctrl+Enter veya "Run" butonuna basarak çalıştırın',
+        ],
+      },
+      {
+        subtitle: 'Schema Browser',
+        text: 'Sol panelde veritabanındaki tüm tablolar ve sütunları listelenir:',
+        list: [
+          'Tablo adına tıklayarak sütunlarını genişletin',
+          'Her sütunun tipi (text, integer, timestamp vb.) yanında gösterilir',
+          'FK (Foreign Key) bağlantıları sarı anahtar ikonuyla gösterilir',
+          'Arama kutusuna yazarak tablo/sütun filtreleyebilirsiniz',
+          'Tablo veya sütun adına tıklayarak editöre otomatik ekleyebilirsiniz',
+        ],
+      },
+      {
+        subtitle: 'Örnek Sorgular',
+        text: 'Toolbar\'daki "Examples" butonuna tıklayarak hazır sorgu şablonları yükleyebilirsiniz:',
+        list: [
+          'Hangi kullanıcı hangi ürünü aldı — JOIN sorgusu',
+          'Kategoriye ve bölgeye göre gelir — GROUP BY + JOIN',
+          'En çok harcama yapan müşteriler — HAVING + ORDER BY',
+          'Ürün performansı — LEFT JOIN + aggregation',
+          'Aylık satış trendi — TO_CHAR + GROUP BY',
+        ],
+      },
+      {
+        subtitle: 'Sonuçlar ve Dışa Aktarma',
+        text: 'Sorgu sonuçları alt panelde tablo olarak gösterilir:',
+        list: [
+          'Maksimum 5000 satır döner (performans için sınırlandırılmıştır)',
+          'Satır sayısı, çalışma süresi (ms) başlıkta gösterilir',
+          '"Export CSV" butonu ile sonuçları CSV dosyası olarak indirebilirsiniz',
+          'NULL değerler italik ve gri olarak gösterilir',
+          'Sayısal değerler sağa hizalanır, metin değerler sola',
+        ],
+      },
+      {
+        subtitle: 'Sorgu Geçmişi',
+        text: '"History" butonuna tıklayarak daha önce çalıştırdığınız sorguları görebilirsiniz:',
+        list: [
+          'Son 50 sorgu otomatik kaydedilir',
+          'Her sorgunun çalışma zamanı, satır sayısı ve süresi gösterilir',
+          'Bir sorgua tıklayarak editöre yeniden yükleyebilirsiniz',
+        ],
+      },
+      {
+        subtitle: 'Güvenlik Kuralları',
+        text: 'SQL Editor güvenlik amacıyla bazı kısıtlamalar içerir:',
+        list: [
+          'Sadece SELECT ve WITH (CTE) sorguları çalıştırılabilir',
+          'INSERT, UPDATE, DELETE, DROP, ALTER gibi yazma işlemleri engellenir',
+          'Sorgu zaman aşımı 30 saniyedir',
+          'Admin ve Analyst rolleri SQL Editor kullanabilir',
+        ],
+      },
+    ],
+  },
+  {
     id: 'concepts',
     title: 'Temel Kavramlar',
     icon: (

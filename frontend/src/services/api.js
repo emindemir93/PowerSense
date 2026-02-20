@@ -118,6 +118,11 @@ export const alertsApi = {
   delete: (id) => api.delete(`/alerts/${id}`),
 };
 
+export const sqlApi = {
+  execute: (sql) => api.post('/sql/execute', { sql }),
+  tables: () => api.get('/sql/tables'),
+};
+
 export const reportsApi = {
   list: () => api.get('/reports'),
   get: (id) => api.get(`/reports/${id}`),
