@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sqlApi, connectionsApi, savedQueriesApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
@@ -101,6 +101,12 @@ export default function SQLEditorPage() {
   const [loadedQueryName, setLoadedQueryName] = useState('');
   const [saveMode, setSaveMode] = useState(null);
   const textareaRef = useRef(null);
+  const acRef = useRef(null);
+  const [acItems, setAcItems] = useState([]);
+  const [acIndex, setAcIndex] = useState(0);
+  const [acPos, setAcPos] = useState(null);
+  const [acWordStart, setAcWordStart] = useState(0);
+  const acVisible = acItems.length > 0 && acPos !== null;
 
   const { data: connections } = useQuery({
     queryKey: ['connections'],
@@ -224,6 +230,138 @@ export default function SQLEditorPage() {
   }) || [];
 
   const lineCount = sql.split('\n').length;
+
+  const acCatalog = useMemo(() => {
+    if (!tables?.length) return [];
+    const items = [];
+    for (const tbl of tables) {
+      items.push({ label: tbl.name, kind: tbl.type === 'view' ? 'view' : 'table', detail: `${tbl.columns.length} cols` });
+      for (const col of tbl.columns) {
+        items.push({ label: col.column, kind: 'column', detail: `${col.type} · ${tbl.name}`, parent: tbl.name });
+      }
+    }
+    for (const kw of SQL_KEYWORDS) {
+      items.push({ label: kw, kind: 'keyword', detail: 'SQL' });
+    }
+    return items;
+  }, [tables]);
+
+  const getContextTable = useCallback((text, cursorPos) => {
+    const before = text.substring(0, cursorPos).toUpperCase();
+    const fromMatch = before.match(/(?:FROM|JOIN|UPDATE|INTO)\s+(\w+)\s*$/i);
+    if (fromMatch) return null;
+    const tableRef = before.match(/(?:FROM|JOIN)\s+(\w+)(?:\s+(?:AS\s+)?\w+)?\s+(?:WHERE|ON|AND|OR|SET|GROUP|ORDER|HAVING|LEFT|RIGHT|INNER|CROSS|LIMIT)?\s*$/i);
+    if (tableRef) return tableRef[1];
+    const dotMatch = text.substring(0, cursorPos).match(/(\w+)\.\w*$/);
+    if (dotMatch) return dotMatch[1];
+    return null;
+  }, []);
+
+  const getCaretCoords = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return null;
+    const pos = ta.selectionStart;
+    const text = ta.value.substring(0, pos);
+    const lines = text.split('\n');
+    const lineIdx = lines.length - 1;
+    const colIdx = lines[lineIdx].length;
+    const lineH = 20;
+    const charW = 7.8;
+    const rect = ta.getBoundingClientRect();
+    return {
+      top: rect.top + (lineIdx + 1) * lineH - ta.scrollTop + 4,
+      left: rect.left + colIdx * charW + 12 - ta.scrollLeft,
+    };
+  }, []);
+
+  const dismissAc = useCallback(() => {
+    setAcItems([]);
+    setAcPos(null);
+    setAcIndex(0);
+  }, []);
+
+  const applyAcItem = useCallback((item) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const pos = ta.selectionStart;
+    const before = sql.substring(0, pos);
+    const after = sql.substring(pos);
+    const dotIdx = before.lastIndexOf('.');
+    const start = dotIdx >= 0 && dotIdx >= acWordStart ? dotIdx + 1 : acWordStart;
+    const newSql = before.substring(0, start) + item.label + after;
+    setSql(newSql);
+    dismissAc();
+    setTimeout(() => {
+      ta.focus();
+      const newPos = start + item.label.length;
+      ta.selectionStart = ta.selectionEnd = newPos;
+    }, 0);
+  }, [sql, acWordStart, dismissAc]);
+
+  const triggerAutocomplete = useCallback((text, cursorPos) => {
+    if (!acCatalog.length) { dismissAc(); return; }
+    const before = text.substring(0, cursorPos);
+    const wordMatch = before.match(/(\w+\.)?(\w*)$/);
+    if (!wordMatch || (!wordMatch[1] && wordMatch[2].length < 1)) { dismissAc(); return; }
+
+    const prefix = wordMatch[1]; // e.g. "products."
+    const fragment = wordMatch[2].toLowerCase();
+    const wordStart = cursorPos - (wordMatch[0]?.length || 0);
+    const isDot = !!prefix;
+    const dotTable = isDot ? prefix.replace('.', '').toLowerCase() : null;
+
+    const ctxTable = getContextTable(text, cursorPos);
+
+    let matches;
+    if (isDot && dotTable) {
+      matches = acCatalog.filter((it) =>
+        it.kind === 'column' && it.parent?.toLowerCase() === dotTable &&
+        it.label.toLowerCase().startsWith(fragment)
+      );
+    } else {
+      matches = acCatalog.filter((it) => {
+        const l = it.label.toLowerCase();
+        if (!l.startsWith(fragment) && !l.includes(fragment)) return false;
+        if (ctxTable && it.kind === 'column' && it.parent?.toLowerCase() !== ctxTable.toLowerCase()) return false;
+        return true;
+      });
+    }
+
+    matches.sort((a, b) => {
+      const al = a.label.toLowerCase();
+      const bl = b.label.toLowerCase();
+      const aStarts = al.startsWith(fragment) ? 0 : 1;
+      const bStarts = bl.startsWith(fragment) ? 0 : 1;
+      if (aStarts !== bStarts) return aStarts - bStarts;
+      const kindOrder = { table: 0, view: 1, column: 2, keyword: 3 };
+      return (kindOrder[a.kind] || 9) - (kindOrder[b.kind] || 9);
+    });
+
+    const limited = matches.slice(0, 12);
+    if (limited.length === 0 || (limited.length === 1 && limited[0].label.toLowerCase() === fragment)) {
+      dismissAc();
+      return;
+    }
+
+    setAcWordStart(wordStart);
+    setAcItems(limited);
+    setAcIndex(0);
+    setAcPos(getCaretCoords());
+  }, [acCatalog, getContextTable, getCaretCoords, dismissAc]);
+
+  const handleSqlChange = useCallback((e) => {
+    const val = e.target.value;
+    setSql(val);
+    const cursorPos = e.target.selectionStart;
+    setTimeout(() => triggerAutocomplete(val, cursorPos), 0);
+  }, [triggerAutocomplete]);
+
+  useEffect(() => {
+    if (acVisible && acRef.current) {
+      const active = acRef.current.querySelector('[data-ac-active="true"]');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+  }, [acIndex, acVisible]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -561,25 +699,98 @@ export default function SQLEditorPage() {
                 ))}
               </div>
               {/* Textarea */}
-              <textarea
-                ref={textareaRef}
-                value={sql}
-                onChange={(e) => setSql(e.target.value)}
-                placeholder={t('sqlEditor.placeholder')}
-                spellCheck={false}
-                style={{
-                  flex: 1, background: 'var(--bg-primary)', color: 'var(--text-primary)',
-                  border: 'none', outline: 'none', resize: 'none', padding: '10px 12px',
-                  fontFamily: '"SF Mono", "Fira Code", "Consolas", monospace',
-                  fontSize: 13, lineHeight: '20px', tabSize: 2,
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Tab') {
-                    e.preventDefault();
-                    insertAtCursor('  ');
-                  }
-                }}
-              />
+              <div style={{ flex: 1, position: 'relative' }}>
+                <textarea
+                  ref={textareaRef}
+                  value={sql}
+                  onChange={handleSqlChange}
+                  placeholder={t('sqlEditor.placeholder')}
+                  spellCheck={false}
+                  style={{
+                    width: '100%', height: '100%', background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                    border: 'none', outline: 'none', resize: 'none', padding: '10px 12px',
+                    fontFamily: '"SF Mono", "Fira Code", "Consolas", monospace',
+                    fontSize: 13, lineHeight: '20px', tabSize: 2,
+                  }}
+                  onKeyDown={(e) => {
+                    if (acVisible) {
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setAcIndex((i) => Math.min(i + 1, acItems.length - 1)); return; }
+                      if (e.key === 'ArrowUp') { e.preventDefault(); setAcIndex((i) => Math.max(i - 1, 0)); return; }
+                      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); applyAcItem(acItems[acIndex]); return; }
+                      if (e.key === 'Escape') { e.preventDefault(); dismissAc(); return; }
+                    }
+                    if (e.key === 'Tab' && !acVisible) {
+                      e.preventDefault();
+                      insertAtCursor('  ');
+                    }
+                    if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      const ta = textareaRef.current;
+                      if (ta) triggerAutocomplete(sql, ta.selectionStart);
+                    }
+                  }}
+                  onBlur={() => setTimeout(dismissAc, 150)}
+                  onClick={() => dismissAc()}
+                />
+
+                {/* Autocomplete Dropdown */}
+                {acVisible && acPos && (
+                  <div
+                    ref={acRef}
+                    style={{
+                      position: 'fixed',
+                      top: acPos.top,
+                      left: acPos.left,
+                      minWidth: 240,
+                      maxWidth: 380,
+                      maxHeight: 260,
+                      overflow: 'auto',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 6,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                      zIndex: 1000,
+                      padding: '4px 0',
+                    }}
+                  >
+                    {acItems.map((item, i) => (
+                      <div
+                        key={`${item.kind}-${item.label}-${i}`}
+                        data-ac-active={i === acIndex ? 'true' : 'false'}
+                        onMouseDown={(e) => { e.preventDefault(); applyAcItem(item); }}
+                        onMouseEnter={() => setAcIndex(i)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '5px 10px', cursor: 'pointer', fontSize: 12,
+                          background: i === acIndex ? 'var(--accent-soft, rgba(56,139,253,0.15))' : 'transparent',
+                          color: i === acIndex ? 'var(--accent)' : 'var(--text-primary)',
+                        }}
+                      >
+                        {/* Kind Icon */}
+                        <span style={{
+                          width: 18, height: 18, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 9, fontWeight: 700, flexShrink: 0,
+                          background: item.kind === 'table' ? '#388bfd20' : item.kind === 'view' ? '#7c3aed20' : item.kind === 'column' ? '#3fb95020' : '#d2992220',
+                          color: item.kind === 'table' ? '#388bfd' : item.kind === 'view' ? '#a371f7' : item.kind === 'column' ? '#3fb950' : '#d29922',
+                        }}>
+                          {item.kind === 'table' ? 'T' : item.kind === 'view' ? 'V' : item.kind === 'column' ? 'C' : 'K'}
+                        </span>
+                        {/* Label */}
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.label}
+                        </span>
+                        {/* Detail */}
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {item.detail}
+                        </span>
+                      </div>
+                    ))}
+                    <div style={{ padding: '4px 10px', fontSize: 9, color: 'var(--text-muted)', borderTop: '1px solid var(--border)', marginTop: 2 }}>
+                      ↑↓ {t('sqlEditor.acNavigate')} · Tab/Enter {t('sqlEditor.acSelect')} · Esc {t('sqlEditor.acDismiss')} · Ctrl+Space {t('sqlEditor.acTrigger')}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

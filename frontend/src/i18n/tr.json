@@ -307,6 +307,10 @@
     "updateQueryHint": "Mevcut sorguyu güncelleyin veya yeni bir sorgu olarak kaydedin.",
     "editing": "Düzenleniyor:",
     "searchTablesViews": "Tablo/görünüm/kolon ara...",
+    "acNavigate": "gezin",
+    "acSelect": "seç",
+    "acDismiss": "kapat",
+    "acTrigger": "aç",
     "exampleQueries": {
       "usersProducts": "Ürün satın alan kullanıcılar",
       "revenueCategory": "Kategori ve bölgeye göre gelir",

@@ -307,6 +307,10 @@
     "updateQueryHint": "Update the existing query or save as a new one.",
     "editing": "Editing:",
     "searchTablesViews": "Search tables/views/columns...",
+    "acNavigate": "navigate",
+    "acSelect": "select",
+    "acDismiss": "dismiss",
+    "acTrigger": "trigger",
     "exampleQueries": {
       "usersProducts": "Users who bought products",
       "revenueCategory": "Revenue by category & region",
