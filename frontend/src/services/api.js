@@ -95,6 +95,17 @@ export const queryApi = {
   filterValues: (source, field) => api.get(`/query/filter-values/${source}/${field}`),
 };
 
+export const reportsApi = {
+  list: () => api.get('/reports'),
+  get: (id) => api.get(`/reports/${id}`),
+  create: (data) => api.post('/reports', data),
+  update: (id, data) => api.put(`/reports/${id}`, data),
+  delete: (id) => api.delete(`/reports/${id}`),
+  duplicate: (id) => api.post(`/reports/${id}/duplicate`),
+  run: (id) => api.post(`/reports/${id}/run`),
+  export: (id) => api.get(`/reports/${id}/export`, { responseType: 'blob' }),
+};
+
 export const ordersApi = {
   list: (params) => api.get('/orders', { params }),
   get: (id) => api.get(`/orders/${id}`),

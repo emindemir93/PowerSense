@@ -876,3 +876,36 @@ a:hover {
 .text-danger { color: var(--danger); }
 .text-warning { color: var(--warning); }
 .text-muted { color: var(--text-secondary); }
+
+/* ─── Report Builder ──────────────────────── */
+.toolbar-title input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  width: 300px;
+  outline: none;
+}
+.toolbar-title input:hover,
+.toolbar-title input:focus {
+  border-color: var(--border);
+  background: var(--bg-input);
+}
+
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.form-checkbox input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
