@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, ScatterChart, Scatter,
+  FunnelChart, Funnel, LabelList,
+  Treemap,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts';
@@ -40,6 +42,12 @@ export default function WidgetRenderer({ widget, data, loading, onCrossFilter, a
     case 'donut': return <PieChartWidget widget={widget} data={data} onCrossFilter={onCrossFilter} innerRadius="60%" />;
     case 'scatter': return <ScatterChartWidget widget={widget} data={data} />;
     case 'table': return <TableWidget widget={widget} data={data} />;
+    case 'gauge': return <GaugeWidget widget={widget} data={data} />;
+    case 'funnel': return <FunnelChartWidget widget={widget} data={data} />;
+    case 'treemap': return <TreemapWidget widget={widget} data={data} />;
+    case 'waterfall': return <WaterfallWidget widget={widget} data={data} />;
+    case 'regionmap': return <RegionMapWidget widget={widget} data={data} onCrossFilter={onCrossFilter} />;
+    case 'pivot': return <PivotTableWidget widget={widget} data={data} />;
     default: return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Unknown: {widget.type}</div>;
   }
 }
@@ -220,11 +228,11 @@ function ScatterChartWidget({ widget, data }) {
 }
 
 function TableWidget({ widget, data }) {
-  const dims = widget.data_config?.dimensions || [];
-  const measures = widget.data_config?.measures || [];
   const condRules = widget.visual_config?.conditionalRules || [];
 
   const columns = useMemo(() => {
+    const dims = widget.data_config?.dimensions || [];
+    const measures = widget.data_config?.measures || [];
     const cols = [];
     dims.forEach((d) => cols.push({ key: d, label: d.replace(/_/g, ' '), type: 'dimension' }));
     measures.forEach((m, i) => {
@@ -232,7 +240,7 @@ function TableWidget({ widget, data }) {
       cols.push({ key: alias, label: (m.alias || m.field || '').replace(/_/g, ' '), type: 'measure' });
     });
     return cols;
-  }, [dims, measures]);
+  }, [widget.data_config]);
 
   return (
     <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>
@@ -257,6 +265,273 @@ function TableWidget({ widget, data }) {
                   </td>
                 );
               })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function GaugeWidget({ widget, data }) {
+  const vc = widget.visual_config || {};
+  const value = data?.[0] ? Object.values(data[0]).find((v) => typeof v === 'number') ?? 0 : 0;
+  const target = parseFloat(vc.gaugeTarget) || 100;
+  const pct = Math.min(Math.max((value / target) * 100, 0), 100);
+  const angle = -90 + (pct / 100) * 180;
+  const color = pct >= 80 ? '#3fb950' : pct >= 50 ? '#d29922' : '#f85149';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+      <svg viewBox="0 0 200 120" style={{ width: '80%', maxWidth: 240 }}>
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#21262d" strokeWidth="14" strokeLinecap="round" />
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke={color} strokeWidth="14" strokeLinecap="round"
+          strokeDasharray={`${pct * 2.51} 251`} />
+        <g transform={`rotate(${angle}, 100, 100)`}>
+          <line x1="100" y1="100" x2="100" y2="32" stroke="#e6edf3" strokeWidth="2.5" strokeLinecap="round" />
+        </g>
+        <circle cx="100" cy="100" r="5" fill="#e6edf3" />
+        <text x="100" y="88" textAnchor="middle" fill={color} fontSize="22" fontWeight="700">
+          {formatAxisValue(value)}
+        </text>
+        <text x="100" y="115" textAnchor="middle" fill="#8b949e" fontSize="10">
+          Target: {formatAxisValue(target)} ({pct.toFixed(0)}%)
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function FunnelChartWidget({ widget, data }) {
+  const dimKey = getDimensionKey(widget);
+  const measureKeys = getMeasureKeys(widget);
+  const colors = getColors(widget);
+
+  const chartData = useMemo(() =>
+    data.map((d, i) => ({
+      name: d[dimKey] || `Step ${i + 1}`,
+      value: parseFloat(d[measureKeys[0]]) || 0,
+      fill: colors[i % colors.length],
+    })).sort((a, b) => b.value - a.value),
+    [data, dimKey, measureKeys, colors]
+  );
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <FunnelChart>
+        <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
+        <Funnel dataKey="value" data={chartData} isAnimationActive>
+          <LabelList position="right" fill="#e6edf3" stroke="none" fontSize={11}
+            formatter={(v) => formatAxisValue(v)} />
+          <LabelList position="left" fill="#8b949e" stroke="none" fontSize={11}
+            dataKey="name" />
+        </Funnel>
+      </FunnelChart>
+    </ResponsiveContainer>
+  );
+}
+
+const TREEMAP_COLORS = ['#4493f8', '#7c3aed', '#3fb950', '#d29922', '#f85149', '#58a6ff', '#bc8cff', '#56d364'];
+
+function TreemapWidget({ widget, data }) {
+  const dimKey = getDimensionKey(widget);
+  const measureKeys = getMeasureKeys(widget);
+
+  const chartData = useMemo(() =>
+    data.map((d, i) => ({
+      name: truncateLabel(d[dimKey] || `Item ${i}`, 18),
+      size: parseFloat(d[measureKeys[0]]) || 0,
+      fill: TREEMAP_COLORS[i % TREEMAP_COLORS.length],
+    })),
+    [data, dimKey, measureKeys]
+  );
+
+  const CustomContent = ({ x, y, width, height, name, size, fill }) => {
+    if (width < 30 || height < 20) return null;
+    return (
+      <g>
+        <rect x={x} y={y} width={width} height={height} fill={fill} stroke="#0d1117" strokeWidth={2} rx={4} style={{ opacity: 0.85 }} />
+        {width > 50 && height > 35 && (
+          <>
+            <text x={x + width / 2} y={y + height / 2 - 6} textAnchor="middle" fill="#fff" fontSize={11} fontWeight={600}>
+              {name}
+            </text>
+            <text x={x + width / 2} y={y + height / 2 + 10} textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize={10}>
+              {formatAxisValue(size)}
+            </text>
+          </>
+        )}
+      </g>
+    );
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <Treemap data={chartData} dataKey="size" nameKey="name" content={<CustomContent />}>
+        <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
+      </Treemap>
+    </ResponsiveContainer>
+  );
+}
+
+function WaterfallWidget({ widget, data }) {
+  const dimKey = getDimensionKey(widget);
+  const measureKeys = getMeasureKeys(widget);
+
+  const chartData = useMemo(() => {
+    let cumulative = 0;
+    return data.map((d) => {
+      const val = parseFloat(d[measureKeys[0]]) || 0;
+      const base = cumulative;
+      cumulative += val;
+      return {
+        name: truncateLabel(d[dimKey], 14),
+        base: Math.min(base, cumulative),
+        value: Math.abs(val),
+        total: cumulative,
+        isPositive: val >= 0,
+        rawValue: val,
+      };
+    });
+  }, [data, dimKey, measureKeys]);
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#21262d" vertical={false} />
+        <XAxis dataKey="name" {...AXIS_STYLE} />
+        <YAxis {...AXIS_STYLE} tickFormatter={formatAxisValue} width={50} />
+        <Tooltip {...TOOLTIP_STYLE} formatter={(v, name, props) => {
+          if (name === 'base') return [null, null];
+          return [formatAxisValue(props.payload.rawValue), 'Value'];
+        }} />
+        <Bar dataKey="base" stackId="stack" fill="transparent" />
+        <Bar dataKey="value" stackId="stack" radius={[3, 3, 0, 0]}>
+          {chartData.map((entry, i) => (
+            <Cell key={i} fill={entry.isPositive ? '#3fb950' : '#f85149'} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function RegionMapWidget({ widget, data, onCrossFilter }) {
+  const dimKey = getDimensionKey(widget);
+  const measureKeys = getMeasureKeys(widget);
+  const colors = ['#0e4429', '#006d32', '#26a641', '#39d353', '#3fb950'];
+
+  const { items, maxVal } = useMemo(() => {
+    const items = data.map((d) => ({
+      name: d[dimKey] || 'Unknown',
+      value: parseFloat(d[measureKeys[0]]) || 0,
+    })).sort((a, b) => b.value - a.value);
+    const maxVal = Math.max(...items.map((i) => i.value), 1);
+    return { items, maxVal };
+  }, [data, dimKey, measureKeys]);
+
+  const getColor = (val) => {
+    const idx = Math.floor((val / maxVal) * (colors.length - 1));
+    return colors[Math.min(idx, colors.length - 1)];
+  };
+
+  return (
+    <div style={{ overflow: 'auto', height: '100%', padding: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 6 }}>
+        {items.map((item) => (
+          <div key={item.name} onClick={() => onCrossFilter && onCrossFilter(dimKey, item.name)}
+            style={{
+              background: getColor(item.value), borderRadius: 6, padding: '10px 8px',
+              cursor: 'pointer', transition: 'transform 0.15s', textAlign: 'center',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {item.name}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+              {formatAxisValue(item.value)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PivotTableWidget({ widget, data }) {
+  const condRules = widget.visual_config?.conditionalRules || [];
+
+  const { rowDim, colDim, pivotData, colValues, measures: pivotMeasures } = useMemo(() => {
+    const dims = widget.data_config?.dimensions || [];
+    const measures = widget.data_config?.measures || [];
+    const rowDim = dims[0] || null;
+    const colDim = dims.length >= 2 ? dims[1] : null;
+    const measureAlias = measures[0]?.alias || 'measure_0';
+
+    if (!colDim) {
+      return { rowDim, colDim: null, pivotData: data, colValues: [], measures };
+    }
+
+    const colValues = [...new Set(data.map((d) => d[colDim]))].sort();
+    const rowMap = {};
+    data.forEach((d) => {
+      const rKey = d[rowDim] ?? 'Unknown';
+      if (!rowMap[rKey]) rowMap[rKey] = { [rowDim]: rKey, __total: 0 };
+      const val = parseFloat(d[measureAlias]) || 0;
+      rowMap[rKey][d[colDim]] = val;
+      rowMap[rKey].__total += val;
+    });
+
+    return { rowDim, colDim, pivotData: Object.values(rowMap), colValues, measures };
+  }, [data, widget.data_config]);
+
+  if (!rowDim) return <div className="empty-state"><p style={{ fontSize: 12 }}>Pivot needs at least 1 dimension</p></div>;
+
+  if (!colDim) {
+    return (
+      <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>
+        <table className="widget-table">
+          <thead><tr><th>{rowDim}</th>{pivotMeasures.map((m, i) => <th key={i}>{m.alias || m.field}</th>)}</tr></thead>
+          <tbody>
+            {data.map((row, i) => (
+              <tr key={i}>
+                <td>{row[rowDim] ?? '-'}</td>
+                {pivotMeasures.map((m, mi) => {
+                  const alias = m.alias || `measure_${mi}`;
+                  const val = row[alias];
+                  const cc = getConditionalColor(val, condRules);
+                  return <td key={mi} style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: cc || undefined, fontWeight: cc ? 600 : undefined }}>{formatAxisValue(val)}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>
+      <table className="widget-table">
+        <thead>
+          <tr>
+            <th style={{ position: 'sticky', left: 0, background: 'var(--bg-tertiary)', zIndex: 2 }}>{rowDim}</th>
+            {colValues.map((cv) => <th key={cv}>{truncateLabel(cv, 14)}</th>)}
+            <th style={{ fontWeight: 700 }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pivotData.map((row, i) => (
+            <tr key={i}>
+              <td style={{ position: 'sticky', left: 0, background: 'var(--bg-secondary)', zIndex: 1, fontWeight: 500 }}>{row[rowDim]}</td>
+              {colValues.map((cv) => {
+                const val = row[cv] || 0;
+                const cc = getConditionalColor(val, condRules);
+                return <td key={cv} style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: cc || undefined, fontWeight: cc ? 600 : undefined }}>{val ? formatAxisValue(val) : '-'}</td>;
+              })}
+              <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatAxisValue(row.__total || 0)}</td>
             </tr>
           ))}
         </tbody>

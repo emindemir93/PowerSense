@@ -105,6 +105,19 @@ export const bookmarksApi = {
   delete: (id) => api.delete(`/bookmarks/${id}`),
 };
 
+export const commentsApi = {
+  list: (dashboardId) => api.get(`/comments/${dashboardId}`),
+  create: (data) => api.post('/comments', data),
+  delete: (id) => api.delete(`/comments/${id}`),
+};
+
+export const alertsApi = {
+  list: (dashboardId) => api.get(`/alerts/${dashboardId}`),
+  create: (data) => api.post('/alerts', data),
+  update: (id, data) => api.put(`/alerts/${id}`, data),
+  delete: (id) => api.delete(`/alerts/${id}`),
+};
+
 export const reportsApi = {
   list: () => api.get('/reports'),
   get: (id) => api.get(`/reports/${id}`),

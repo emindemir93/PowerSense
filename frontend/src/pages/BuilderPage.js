@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { dashboardsApi, bookmarksApi } from '../services/api';
+import { dashboardsApi, bookmarksApi, commentsApi, alertsApi } from '../services/api';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { WIDGET_TYPES } from '../utils/helpers';
@@ -26,6 +26,9 @@ export default function BuilderPage() {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [bookmarkName, setBookmarkName] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [showAlerts, setShowAlerts] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', id],
@@ -36,6 +39,18 @@ export default function BuilderPage() {
   const { data: bookmarks, refetch: refetchBookmarks } = useQuery({
     queryKey: ['bookmarks', id],
     queryFn: () => bookmarksApi.list(id).then((r) => r.data.data),
+    enabled: !!id,
+  });
+
+  const { data: comments, refetch: refetchComments } = useQuery({
+    queryKey: ['comments', id],
+    queryFn: () => commentsApi.list(id).then((r) => r.data.data),
+    enabled: !!id,
+  });
+
+  const { data: alerts, refetch: refetchAlerts } = useQuery({
+    queryKey: ['alerts', id],
+    queryFn: () => alertsApi.list(id).then((r) => r.data.data),
     enabled: !!id,
   });
 
@@ -71,6 +86,21 @@ export default function BuilderPage() {
   const deleteBookmarkMutation = useMutation({
     mutationFn: (bmId) => bookmarksApi.delete(bmId),
     onSuccess: () => refetchBookmarks(),
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: (data) => commentsApi.create(data),
+    onSuccess: () => { refetchComments(); setCommentText(''); },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (cId) => commentsApi.delete(cId),
+    onSuccess: () => refetchComments(),
+  });
+
+  const deleteAlertMutation = useMutation({
+    mutationFn: (aId) => alertsApi.delete(aId),
+    onSuccess: () => refetchAlerts(),
   });
 
   const handleAddWidget = useCallback((widgetType) => {
@@ -215,6 +245,24 @@ export default function BuilderPage() {
             )}
           </div>
 
+          {/* Comments */}
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowComments(!showComments)} title="Comments">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+            </svg>
+            {comments?.length > 0 && <span style={{ fontSize: 10, color: 'var(--accent)' }}>{comments.length}</span>}
+          </button>
+
+          {/* Alerts */}
+          {canEdit && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowAlerts(!showAlerts)} title="Alerts">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              {alerts?.filter((a) => a.triggered).length > 0 && <span style={{ fontSize: 10, color: 'var(--danger)' }}>{alerts.filter((a) => a.triggered).length}</span>}
+            </button>
+          )}
+
           {editMode && (
             <>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowAddWidget(true)}>
@@ -263,6 +311,99 @@ export default function BuilderPage() {
           </div>
         </div>
       )}
+
+      {showComments && (
+        <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 340, background: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', zIndex: 100, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 20px rgba(0,0,0,0.3)' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: 14 }}>Comments</h3>
+            <button className="btn btn-ghost btn-icon" onClick={() => setShowComments(false)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+            {comments?.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 40 }}>No comments yet</p>}
+            {comments?.map((c) => (
+              <div key={c.id} style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--accent)' }}>{c.user_name || 'User'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{new Date(c.created_at).toLocaleString('tr-TR')}</span>
+                    <button onClick={() => deleteCommentMutation.mutate(c.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14 }}>×</button>
+                  </div>
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4 }}>{c.text}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
+            <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment..."
+              onKeyDown={(e) => { if (e.key === 'Enter' && commentText.trim()) addCommentMutation.mutate({ dashboard_id: id, text: commentText }); }}
+              style={{ flex: 1, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', color: 'var(--text-primary)', fontSize: 12 }} />
+            <button className="btn btn-primary btn-sm" disabled={!commentText.trim()} onClick={() => addCommentMutation.mutate({ dashboard_id: id, text: commentText })}>Send</button>
+          </div>
+        </div>
+      )}
+
+      {showAlerts && (
+        <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 380, background: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', zIndex: 100, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 20px rgba(0,0,0,0.3)' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: 14 }}>Alerts & Thresholds</h3>
+            <button className="btn btn-ghost btn-icon" onClick={() => setShowAlerts(false)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+            <AlertManager dashboardId={id} alerts={alerts || []} onDelete={(aId) => deleteAlertMutation.mutate(aId)} onRefresh={refetchAlerts} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AlertManager({ dashboardId, alerts, onDelete, onRefresh }) {
+  const [name, setName] = useState('');
+  const [measure, setMeasure] = useState('');
+  const [operator, setOperator] = useState('>');
+  const [threshold, setThreshold] = useState('');
+
+  const createMutation = useMutation({
+    mutationFn: (data) => alertsApi.create(data),
+    onSuccess: () => { setName(''); setMeasure(''); setThreshold(''); onRefresh(); },
+  });
+
+  const handleCreate = () => {
+    if (!name || !measure || !threshold) return;
+    createMutation.mutate({ dashboard_id: dashboardId, name, measure, operator, threshold: parseFloat(threshold) });
+  };
+
+  return (
+    <div>
+      <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>New Alert</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alert name" style={{ width: '100%', marginBottom: 6, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
+        <input value={measure} onChange={(e) => setMeasure(e.target.value)} placeholder="Measure name (e.g. total_revenue)" style={{ width: '100%', marginBottom: 6, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <select value={operator} onChange={(e) => setOperator(e.target.value)} style={{ flex: 1, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }}>
+            <option value=">">{'>'}</option><option value=">=">{'>='}</option><option value="<">{'<'}</option><option value="<=">{'<='}</option><option value="=">{'='}</option>
+          </select>
+          <input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder="Threshold" style={{ flex: 2, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={handleCreate} style={{ width: '100%' }}>Create Alert</button>
+      </div>
+      {alerts.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 20 }}>No alerts defined</p>}
+      {alerts.map((a) => (
+        <div key={a.id} style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 10, marginBottom: 6, borderLeft: `3px solid ${a.triggered ? 'var(--danger)' : a.is_active ? 'var(--accent)' : 'var(--text-muted)'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, fontSize: 12 }}>{a.name}</span>
+            <button onClick={() => onDelete(a.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14 }}>×</button>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            {a.measure} {a.operator} {a.threshold}
+            {a.triggered && <span style={{ color: 'var(--danger)', fontWeight: 600, marginLeft: 8 }}>TRIGGERED</span>}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -279,6 +420,12 @@ function WidgetTypeIcon({ type }) {
     scatter: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="7" cy="14" r="2" /><circle cx="14" cy="8" r="2" /><circle cx="18" cy="16" r="2" /></svg>,
     table: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></svg>,
     slicer: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>,
+    gauge: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12" /><path d="M12 12l4-4" /><circle cx="12" cy="12" r="1" /></svg>,
+    funnel: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 4h18l-5 7v6l-4 3V11z" /></svg>,
+    treemap: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="8" height="10" rx="1" /><rect x="13" y="3" width="8" height="6" rx="1" /><rect x="13" y="11" width="8" height="10" rx="1" /><rect x="3" y="15" width="8" height="6" rx="1" /></svg>,
+    waterfall: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="14" width="3" height="7" rx="1" /><rect x="8" y="8" width="3" height="6" rx="1" /><rect x="13" y="11" width="3" height="3" rx="1" /><rect x="18" y="3" width="3" height="8" rx="1" /></svg>,
+    regionmap: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15 15 0 014 10 15 15 0 01-4 10 15 15 0 01-4-10A15 15 0 0112 2" /></svg>,
+    pivot: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>,
   };
   return iconMap[type] || iconMap.bar;
 }

@@ -42,6 +42,7 @@ export default function WidgetConfigPanel({ widget, onClose }) {
   const [prefix, setPrefix] = useState(widget?.visual_config?.prefix || '');
   const [slicerField, setSlicerField] = useState(widget?.data_config?.slicerField || '');
   const [conditionalRules, setConditionalRules] = useState(widget?.visual_config?.conditionalRules || []);
+  const [gaugeTarget, setGaugeTarget] = useState(widget?.visual_config?.gaugeTarget || 100);
 
   const { data: schema } = useQuery({
     queryKey: ['query-schema'],
@@ -60,6 +61,7 @@ export default function WidgetConfigPanel({ widget, onClose }) {
       setPrefix(widget.visual_config?.prefix || '');
       setSlicerField(widget.data_config?.slicerField || '');
       setConditionalRules(widget.visual_config?.conditionalRules || []);
+      setGaugeTarget(widget.visual_config?.gaugeTarget || 100);
     }
   }, [widget]);
 
@@ -68,8 +70,10 @@ export default function WidgetConfigPanel({ widget, onClose }) {
   const sourceSchema = schema?.[source];
   const isSlicer = type === 'slicer';
   const isKpi = type === 'kpi';
+  const isGauge = type === 'gauge';
   const isTable = type === 'table';
-  const showCondFormatting = isKpi || isTable;
+  const isPivot = type === 'pivot';
+  const showCondFormatting = isKpi || isTable || isPivot;
 
   const applyChanges = () => {
     updateWidget(widget.id, {
@@ -89,6 +93,7 @@ export default function WidgetConfigPanel({ widget, onClose }) {
         format,
         prefix,
         conditionalRules: conditionalRules.length > 0 ? conditionalRules : undefined,
+        ...(isGauge && { gaugeTarget: parseFloat(gaugeTarget) || 100 }),
       },
     });
   };
@@ -259,6 +264,17 @@ export default function WidgetConfigPanel({ widget, onClose }) {
             <div className="form-group">
               <label className="form-label">Prefix</label>
               <input className="form-input" value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="e.g. $, ₺" />
+            </div>
+          </div>
+        )}
+
+        {/* Gauge Config */}
+        {isGauge && (
+          <div className="config-section">
+            <div className="config-section-title">Gauge Settings</div>
+            <div className="form-group">
+              <label className="form-label">Target Value</label>
+              <input className="form-input" type="number" value={gaugeTarget} onChange={(e) => setGaugeTarget(e.target.value)} />
             </div>
           </div>
         )}

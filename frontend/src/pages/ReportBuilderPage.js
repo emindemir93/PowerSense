@@ -29,6 +29,7 @@ export default function ReportBuilderPage() {
   const [measures, setMeasures] = useState([]);
   const [limit, setLimit] = useState(100);
   const [isPublic, setIsPublic] = useState(false);
+  const [schedule, setSchedule] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -49,6 +50,7 @@ export default function ReportBuilderPage() {
       setName(existingReport.name || '');
       setDescription(existingReport.description || '');
       setIsPublic(existingReport.is_public || false);
+      setSchedule(existingReport.schedule || '');
       const qc = typeof existingReport.query_config === 'string'
         ? JSON.parse(existingReport.query_config)
         : existingReport.query_config;
@@ -109,6 +111,7 @@ export default function ReportBuilderPage() {
       description: description.trim(),
       query_config: queryPayload,
       is_public: isPublic,
+      schedule: schedule || null,
     });
   };
 
@@ -216,10 +219,21 @@ export default function ReportBuilderPage() {
               <label className="form-label">Description</label>
               <input className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does this report show?" />
             </div>
-            <label className="form-checkbox" style={{ marginBottom: 14 }}>
+            <label className="form-checkbox" style={{ marginBottom: 10 }}>
               <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
               Public (visible to all users)
             </label>
+
+            <div className="form-group">
+              <label className="form-label">Schedule (Auto-run)</label>
+              <select className="form-select" value={schedule} onChange={(e) => setSchedule(e.target.value)}>
+                <option value="">No schedule</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+              {schedule && <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>Report will auto-run {schedule} and results will be cached.</span>}
+            </div>
           </div>
 
           <div className="divider" />

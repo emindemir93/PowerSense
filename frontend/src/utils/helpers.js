@@ -15,6 +15,12 @@ export const WIDGET_TYPES = [
   { type: 'scatter', label: 'Scatter Plot', icon: 'scatter', defaultSize: { w: 6, h: 5 } },
   { type: 'table', label: 'Data Table', icon: 'table', defaultSize: { w: 6, h: 5 } },
   { type: 'slicer', label: 'Slicer (Filter)', icon: 'slicer', defaultSize: { w: 3, h: 4 } },
+  { type: 'gauge', label: 'Gauge', icon: 'gauge', defaultSize: { w: 3, h: 3 } },
+  { type: 'funnel', label: 'Funnel Chart', icon: 'funnel', defaultSize: { w: 4, h: 5 } },
+  { type: 'treemap', label: 'Treemap', icon: 'treemap', defaultSize: { w: 6, h: 5 } },
+  { type: 'waterfall', label: 'Waterfall Chart', icon: 'waterfall', defaultSize: { w: 8, h: 5 } },
+  { type: 'regionmap', label: 'Region Map', icon: 'regionmap', defaultSize: { w: 6, h: 5 } },
+  { type: 'pivot', label: 'Pivot Table', icon: 'pivot', defaultSize: { w: 8, h: 6 } },
 ];
 
 export const DRILL_HIERARCHIES = {
