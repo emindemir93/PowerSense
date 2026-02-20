@@ -131,14 +131,14 @@ router.post('/:id/test', authenticate, authorize('admin'), async (req, res) => {
 
 router.post('/test-new', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const { host, port, database, username, password, ssl } = req.body;
+    const { host, port, database, username, password, ssl, db_type } = req.body;
     if (!host || !database || !username || !password) {
       return res.status(400).json({ success: false, message: 'All connection fields required' });
     }
     const result = await testConnection({
       host, port: port || 5432, database,
       username, password_encrypted: password,
-      ssl: ssl || false,
+      ssl: ssl || false, db_type: db_type || 'postgresql',
     });
     res.json({ success: true, data: result });
   } catch (err) {

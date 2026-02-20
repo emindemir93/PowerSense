@@ -2,7 +2,13 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { connectionsApi } from '../services/api';
 
-const EMPTY_FORM = { name: '', host: '', port: 5432, database: '', username: '', password: '', ssl: false, is_default: false };
+const EMPTY_FORM = { name: '', db_type: 'postgresql', host: '', port: 5432, database: '', username: '', password: '', ssl: false, is_default: false };
+
+const DB_TYPES = [
+  { value: 'postgresql', label: 'PostgreSQL', defaultPort: 5432, icon: 'PG' },
+  { value: 'mssql', label: 'SQL Server (MSSQL)', defaultPort: 1433, icon: 'MS' },
+  { value: 'mysql', label: 'MySQL / MariaDB', defaultPort: 3306, icon: 'My' },
+];
 
 export default function ConnectionsPage() {
   const queryClient = useQueryClient();
@@ -47,7 +53,8 @@ export default function ConnectionsPage() {
   const handleEdit = (conn) => {
     setEditId(conn.id);
     setForm({
-      name: conn.name, host: conn.host, port: conn.port,
+      name: conn.name, db_type: conn.db_type || 'postgresql',
+      host: conn.host, port: conn.port,
       database: conn.database, username: conn.username,
       password: '', ssl: conn.ssl, is_default: conn.is_default,
     });
@@ -64,6 +71,7 @@ export default function ConnectionsPage() {
       const res = await connectionsApi.testNew({
         host: form.host, port: form.port, database: form.database,
         username: form.username, password: form.password, ssl: form.ssl,
+        db_type: form.db_type,
       });
       setTestResult(res.data.data);
     } catch (err) {
@@ -142,11 +150,34 @@ export default function ConnectionsPage() {
                   placeholder="e.g. Production Database" />
               </div>
 
+              <div className="form-group">
+                <label className="form-label">Database Type</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {DB_TYPES.map((dbt) => (
+                    <button key={dbt.value} type="button"
+                      onClick={() => {
+                        updateField('db_type', dbt.value);
+                        updateField('port', dbt.defaultPort);
+                      }}
+                      style={{
+                        flex: 1, padding: '10px 8px', borderRadius: 8, cursor: 'pointer',
+                        border: form.db_type === dbt.value ? '2px solid var(--accent)' : '1px solid var(--border)',
+                        background: form.db_type === dbt.value ? 'var(--accent-soft)' : 'var(--bg-tertiary)',
+                        color: form.db_type === dbt.value ? 'var(--accent)' : 'var(--text-secondary)',
+                        textAlign: 'center', transition: 'all 0.15s',
+                      }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>{dbt.icon}</div>
+                      <div style={{ fontSize: 11, fontWeight: 500 }}>{dbt.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12 }}>
                 <div className="form-group">
-                  <label className="form-label">Host *</label>
+                  <label className="form-label">{form.db_type === 'mssql' ? 'Server *' : 'Host *'}</label>
                   <input className="form-input" value={form.host} onChange={(e) => updateField('host', e.target.value)}
-                    placeholder="e.g. localhost or db.example.com" />
+                    placeholder={form.db_type === 'mssql' ? 'e.g. SQLSERVER\\INSTANCE' : 'e.g. localhost or db.example.com'} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Port</label>
@@ -267,6 +298,12 @@ export default function ConnectionsPage() {
                       <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
                     </svg>
                     <span style={{ fontWeight: 700, fontSize: 15 }}>{conn.name}</span>
+                    <span style={{
+                      background: conn.db_type === 'mssql' ? '#cc2927' : conn.db_type === 'mysql' ? '#00758f' : '#336791',
+                      color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                    }}>
+                      {(conn.db_type || 'postgresql').toUpperCase()}
+                    </span>
                     {conn.is_default && (
                       <span style={{ background: 'var(--accent)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>DEFAULT</span>
                     )}
@@ -328,7 +365,8 @@ export default function ConnectionsPage() {
           <li>If no connection is configured, the app uses the built-in database</li>
           <li>Always <strong>test the connection</strong> before setting it as default</li>
           <li>Only <strong>SELECT</strong> queries are allowed on external connections (read-only)</li>
-          <li>Supports PostgreSQL databases with optional SSL</li>
+          <li>Supports <strong>PostgreSQL</strong>, <strong>SQL Server (MSSQL)</strong>, and <strong>MySQL/MariaDB</strong></li>
+          <li>MSSQL: use <code style={{ background: 'var(--bg-tertiary)', padding: '1px 4px', borderRadius: 3, fontSize: 11 }}>SERVER\INSTANCE</code> format for named instances</li>
         </ul>
       </div>
     </div>

@@ -258,10 +258,23 @@ const sections = [
         text: 'Admin kullanıcılar sol menüdeki "Connections" sekmesinden veritabanı bağlantılarını yönetebilir. BI araçları (SQL Editor, Dashboard sorguları, Schema Viewer) bu bağlantıları kullanır.',
         list: [
           '"New Connection" butonuna tıklayarak yeni bağlantı ekleyin',
-          'Bağlantı adı, host, port, veritabanı adı, kullanıcı adı ve şifre girin',
+          'Veritabanı tipini seçin: PostgreSQL, SQL Server (MSSQL), veya MySQL/MariaDB',
+          'Bağlantı adı, host/server, port, veritabanı adı, kullanıcı adı ve şifre girin',
+          'MSSQL için: SERVER\\INSTANCE formatını kullanabilirsiniz (named instances)',
+          'MySQL için: varsayılan port 3306, PostgreSQL 5432, MSSQL 1433',
           'Gerekirse SSL seçeneğini aktifleştirin',
           '"Test Connection" ile bağlantının çalıştığını doğrulayın',
           '"Create" ile bağlantıyı kaydedin',
+        ],
+      },
+      {
+        subtitle: 'Desteklenen Veritabanları',
+        text: 'PowerSense şu veritabanı türlerini destekler:',
+        list: [
+          'PostgreSQL — Tam destek (schema browser, FK ilişkileri, tüm SQL özellikleri)',
+          'SQL Server (MSSQL) — SELECT sorguları, schema browser, FK ilişkileri, T-SQL desteği',
+          'MySQL / MariaDB — SELECT sorguları, schema browser, FK ilişkileri',
+          'Her veritabanı tipi kendi SQL diyalektini kullanır (ör. MSSQL: TOP, PG: LIMIT)',
         ],
       },
       {
