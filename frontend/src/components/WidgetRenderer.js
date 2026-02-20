@@ -229,8 +229,15 @@ function ScatterChartWidget({ widget, data }) {
 
 function TableWidget({ widget, data }) {
   const condRules = widget.visual_config?.conditionalRules || [];
+  const isSql = widget.data_config?.type === 'sql';
 
   const columns = useMemo(() => {
+    if (isSql && data?.length > 0) {
+      return Object.keys(data[0]).map((key) => {
+        const isNum = data.some((row) => typeof row[key] === 'number' || (row[key] !== null && !isNaN(Number(row[key]))));
+        return { key, label: key.replace(/_/g, ' '), type: isNum ? 'measure' : 'dimension' };
+      });
+    }
     const dims = widget.data_config?.dimensions || [];
     const measures = widget.data_config?.measures || [];
     const cols = [];
@@ -240,7 +247,7 @@ function TableWidget({ widget, data }) {
       cols.push({ key: alias, label: (m.alias || m.field || '').replace(/_/g, ' '), type: 'measure' });
     });
     return cols;
-  }, [widget.data_config]);
+  }, [widget.data_config, data, isSql]);
 
   return (
     <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>

@@ -123,6 +123,14 @@ export const sqlApi = {
   tables: (connectionId) => api.get('/sql/tables', { params: { connectionId } }),
 };
 
+export const savedQueriesApi = {
+  list: () => api.get('/saved-queries'),
+  get: (id) => api.get(`/saved-queries/${id}`),
+  create: (data) => api.post('/saved-queries', data),
+  update: (id, data) => api.put(`/saved-queries/${id}`, data),
+  delete: (id) => api.delete(`/saved-queries/${id}`),
+};
+
 export const connectionsApi = {
   list: () => api.get('/connections'),
   get: (id) => api.get(`/connections/${id}`),

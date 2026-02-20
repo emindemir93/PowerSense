@@ -189,11 +189,16 @@ export default function SchemaViewerPage() {
   }
 
   if (error) {
+    const is403 = error?.response?.status === 403;
+    const msg = error?.response?.data?.message || error?.message || 'Unknown error';
     return (
       <div className="content-area">
         <div className="empty-state" style={{ padding: 60 }}>
-          <h3>Access Denied</h3>
-          <p>Only admin users can view the database schema.</p>
+          <h3>{is403 ? 'Access Denied' : 'Error'}</h3>
+          <p>{is403 ? 'Only admin users can view the database schema.' : msg}</p>
+          {error?.response?.status === 401 && (
+            <p style={{ fontSize: 12, marginTop: 8 }}>Token süresi dolmuş olabilir. Çıkış yapıp tekrar giriş yapın.</p>
+          )}
         </div>
       </div>
     );

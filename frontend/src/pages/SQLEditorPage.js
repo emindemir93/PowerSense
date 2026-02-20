@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { sqlApi, connectionsApi } from '../services/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { sqlApi, connectionsApi, savedQueriesApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { formatAxisValue } from '../utils/helpers';
 
@@ -78,7 +78,9 @@ const SQL_KEYWORDS = [
 
 export default function SQLEditorPage() {
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const isAdmin = user?.role === 'admin';
+  const canSave = user?.role === 'admin' || user?.role === 'analyst';
   const [sql, setSql] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -89,6 +91,9 @@ export default function SQLEditorPage() {
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const [showSavedQueries, setShowSavedQueries] = useState(false);
+  const [saveQueryName, setSaveQueryName] = useState('');
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState('');
   const textareaRef = useRef(null);
 
@@ -105,14 +110,30 @@ export default function SQLEditorPage() {
     queryFn: () => sqlApi.tables(activeConnectionId).then((r) => r.data.data),
   });
 
+  const { data: savedQueries = [], refetch: refetchSavedQueries } = useQuery({
+    queryKey: ['saved-queries'],
+    queryFn: () => savedQueriesApi.list().then((r) => r.data.data),
+    enabled: canSave,
+  });
+
+  const saveQueryMutation = useMutation({
+    mutationFn: (data) => savedQueriesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-queries'] });
+      setShowSaveModal(false);
+      setSaveQueryName('');
+    },
+  });
+
   const executeQuery = useCallback(async () => {
     if (!sql.trim() || running) return;
     setRunning(true);
     setError(null);
     setResult(null);
     try {
+      setError(null);
       const res = await sqlApi.execute(sql.trim(), activeConnectionId);
-      setResult(res.data.data);
+      setResult(res.data.data || { rows: [], fields: [] });
       setHistory((prev) => {
         const entry = { sql: sql.trim(), time: new Date().toISOString(), rows: res.data.data.rowCount, elapsed: res.data.data.elapsed };
         return [entry, ...prev.filter((h) => h.sql !== sql.trim())].slice(0, 50);
@@ -224,6 +245,21 @@ export default function SQLEditorPage() {
           <button className="btn btn-ghost btn-sm" onClick={() => setShowHistory(!showHistory)}>
             History ({history.length})
           </button>
+          {canSave && (
+            <>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowSavedQueries(!showSavedQueries)}>
+                Saved ({savedQueries.length})
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowSaveModal(true)}
+                disabled={!sql.trim()}
+                title="Save current query for use in Reports"
+              >
+                Save Query
+              </button>
+            </>
+          )}
           <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
           <button
             className="btn btn-primary btn-sm"
@@ -257,6 +293,56 @@ export default function SQLEditorPage() {
               {eq.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Saved Queries Dropdown */}
+      {showSavedQueries && canSave && (
+        <div style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', padding: 8, maxHeight: 200, overflow: 'auto' }}>
+          {savedQueries.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>No saved queries yet. Write a query and click "Save Query" to save it for use in Reports.</p>
+          ) : (
+            savedQueries.map((sq) => (
+              <div
+                key={sq.id}
+                onClick={() => { setSql(sq.sql); setSelectedConnection(sq.connection_id || ''); setShowSavedQueries(false); setResult(null); setError(null); }}
+                style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: 4, fontSize: 12, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}
+              >
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{sq.name}</div>
+                <div style={{ fontSize: 11, fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>{sq.sql}</div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Save Query Modal */}
+      {showSaveModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setShowSaveModal(false)}>
+          <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 20, minWidth: 360, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
+            onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>Save Query</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Save this query to use it when creating Reports or in Data Explorer.</p>
+            <input
+              className="form-input"
+              placeholder="Query name (e.g. Monthly Sales Summary)"
+              value={saveQueryName}
+              onChange={(e) => setSaveQueryName(e.target.value)}
+              style={{ width: '100%', marginBottom: 12 }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowSaveModal(false); setSaveQueryName(''); }}>Cancel</button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => saveQueryMutation.mutate({ name: saveQueryName.trim(), sql: sql.trim(), connection_id: selectedConnection || undefined })}
+                disabled={!saveQueryName.trim() || saveQueryMutation.isPending}
+              >
+                {saveQueryMutation.isPending ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -495,12 +581,15 @@ export default function SQLEditorPage() {
                 </div>
               )}
 
-              {result?.rows?.length > 0 && (
+              {result?.rows?.length > 0 && (() => {
+                const cols = result.fields?.length ? result.fields : (result.rows[0] && typeof result.rows[0] === 'object'
+                  ? Object.keys(result.rows[0]).map((name) => ({ name })) : []);
+                return (
                 <table className="widget-table" style={{ fontSize: 12 }}>
                   <thead>
                     <tr>
                       <th style={{ width: 40, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 400 }}>#</th>
-                      {result.fields.map((f) => (
+                      {cols.map((f) => (
                         <th key={f.name} style={{ whiteSpace: 'nowrap' }}>{f.name}</th>
                       ))}
                     </tr>
@@ -509,8 +598,9 @@ export default function SQLEditorPage() {
                     {result.rows.map((row, i) => (
                       <tr key={i}>
                         <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 10, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</td>
-                        {result.fields.map((f) => {
-                          const val = row[f.name];
+                        {cols.map((f) => {
+                          const key = f.name in row ? f.name : (Object.keys(row).find((k) => k.toLowerCase() === f.name?.toLowerCase()) || f.name);
+                          const val = row[key];
                           const isNum = typeof val === 'number';
                           return (
                             <td key={f.name} style={{
@@ -528,7 +618,8 @@ export default function SQLEditorPage() {
                     ))}
                   </tbody>
                 </table>
-              )}
+              );
+              })()}
             </div>
           </div>
         </div>

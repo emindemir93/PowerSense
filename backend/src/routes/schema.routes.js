@@ -3,23 +3,60 @@ const db = require('../config/database');
 const { getConnection } = require('../config/connectionManager');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 
-router.get('/', authenticate, authorize('admin'), async (req, res, next) => {
+router.get('/', authenticate, authorize('admin', 'analyst'), async (req, res, next) => {
   try {
     const connectionId = req.query.connectionId;
-    const { db: targetDb, dbType } = await getConnection(connectionId);
+    let targetDb;
+    let dbType = 'postgresql';
+    try {
+      const conn = await getConnection(connectionId);
+      targetDb = conn.db;
+      dbType = conn.dbType || 'postgresql';
+    } catch (err) {
+      targetDb = db;
+      dbType = 'postgresql';
+    }
 
     let result;
-    if (dbType === 'mssql') {
-      result = await getMssqlSchema(targetDb);
-    } else if (dbType === 'mysql') {
-      result = await getMysqlSchema(targetDb);
-    } else {
-      result = await getPostgresSchema(targetDb);
+    try {
+      if (dbType === 'mssql') {
+        result = await getMssqlSchema(targetDb);
+      } else if (dbType === 'mysql') {
+        result = await getMysqlSchema(targetDb);
+      } else {
+        result = await getPostgresSchema(targetDb);
+      }
+    } catch (schemaErr) {
+      throw schemaErr;
     }
 
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 });
+
+function toRows(result) {
+  if (!result) return [];
+  if (Array.isArray(result)) return result;
+  if (result.rows) return result.rows;
+  if (result.recordset) return result.recordset;
+  if (result.recordsets?.[0]) return result.recordsets[0];
+  if (result[0]) return Array.isArray(result[0]) ? result[0] : [result[0]];
+  return [];
+}
+
+function getRowVal(row, ...keys) {
+  if (!row || typeof row !== 'object') return undefined;
+  const keySet = new Set(Object.keys(row));
+  for (const k of keys) {
+    let v = row[k];
+    if (v !== undefined) return v;
+    const upper = typeof k === 'string' ? k.toUpperCase() : k;
+    const lower = typeof k === 'string' ? k.toLowerCase() : k;
+    const found = keySet.has(upper) ? row[upper] : keySet.has(lower) ? row[lower] : undefined;
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
 
 async function getPostgresSchema(targetDb) {
   const dbName = targetDb.client?.config?.connection?.database || 'database';
@@ -70,14 +107,17 @@ async function getPostgresSchema(targetDb) {
       SELECT relname AS table_name, n_live_tup AS estimated_rows
       FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY relname
     `);
-    rowCountResult.rows.forEach((r) => { rowCounts[r.table_name] = parseInt(r.estimated_rows) || 0; });
+    toRows(rowCountResult).forEach((r) => { rowCounts[r.table_name] = parseInt(r.estimated_rows) || 0; });
   } catch { /* ignore if pg_stat not available */ }
 
-  const pkSet = new Set(pkResult.rows.map((r) => `${r.table_name}.${r.column_name}`));
-  const uniqueSet = new Set(uniqueResult.rows.map((r) => `${r.table_name}.${r.column_name}`));
+  const pkRows = toRows(pkResult);
+  const uniqueRows = toRows(uniqueResult);
+  const fkRows = toRows(fkResult);
+  const pkSet = new Set(pkRows.map((r) => `${r.table_name}.${r.column_name}`));
+  const uniqueSet = new Set(uniqueRows.map((r) => `${r.table_name}.${r.column_name}`));
 
   const columnsByTable = {};
-  columnsResult.rows.forEach((c) => {
+  toRows(columnsResult).forEach((c) => {
     if (!columnsByTable[c.table_name]) columnsByTable[c.table_name] = [];
     columnsByTable[c.table_name].push({
       name: c.column_name,
@@ -86,18 +126,18 @@ async function getPostgresSchema(targetDb) {
       hasDefault: !!c.column_default,
       isPrimaryKey: pkSet.has(`${c.table_name}.${c.column_name}`),
       isUnique: uniqueSet.has(`${c.table_name}.${c.column_name}`),
-      isForeignKey: fkResult.rows.some((fk) => fk.source_table === c.table_name && fk.source_column === c.column_name),
+      isForeignKey: fkRows.some((fk) => fk.source_table === c.table_name && fk.source_column === c.column_name),
       position: c.ordinal_position,
     });
   });
 
-  const tables = tablesResult.rows.map((t) => ({
+  const tables = toRows(tablesResult).map((t) => ({
     name: t.table_name,
     columns: columnsByTable[t.table_name] || [],
     rowCount: rowCounts[t.table_name] || 0,
   }));
 
-  const relationships = fkResult.rows.map((fk) => ({
+  const relationships = fkRows.map((fk) => ({
     name: fk.constraint_name,
     sourceTable: fk.source_table, sourceColumn: fk.source_column,
     targetTable: fk.target_table, targetColumn: fk.target_column,
@@ -105,19 +145,21 @@ async function getPostgresSchema(targetDb) {
 
   return {
     database: dbName, dbType: 'postgresql', tables, relationships,
-    stats: { tableCount: tables.length, relationshipCount: relationships.length, totalColumns: columnsResult.rows.length },
+    stats: { tableCount: tables.length, relationshipCount: relationships.length, totalColumns: toRows(columnsResult).length },
   };
 }
 
 async function getMssqlSchema(targetDb) {
   const dbResult = await targetDb.raw('SELECT DB_NAME() AS db');
-  const dbName = (dbResult[0] || dbResult.rows || [])[0]?.db || 'database';
+  const dbRows = toRows(dbResult);
+  const dbName = getRowVal(dbRows[0], 'db', 'DB') || 'database';
 
   const tablesRaw = await targetDb.raw(`
     SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
     WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
   `);
-  const tableNames = (tablesRaw[0] || tablesRaw.rows || tablesRaw).map((r) => r.table_name);
+  const tableRows = toRows(tablesRaw);
+  const tableNames = tableRows.map((r) => getRowVal(r, 'table_name', 'TABLE_NAME') || r.table_name || r.TABLE_NAME).filter(Boolean);
 
   const colsRaw = await targetDb.raw(`
     SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type,
@@ -126,7 +168,7 @@ async function getMssqlSchema(targetDb) {
       ORDINAL_POSITION AS ordinal_position
     FROM INFORMATION_SCHEMA.COLUMNS ORDER BY TABLE_NAME, ORDINAL_POSITION
   `);
-  const cols = colsRaw[0] || colsRaw.rows || colsRaw;
+  const cols = toRows(colsRaw);
 
   const pkRaw = await targetDb.raw(`
     SELECT tc.TABLE_NAME AS table_name, kcu.COLUMN_NAME AS column_name
@@ -135,7 +177,7 @@ async function getMssqlSchema(targetDb) {
       ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
     WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
   `);
-  const pks = pkRaw[0] || pkRaw.rows || pkRaw;
+  const pks = toRows(pkRaw);
 
   const fkRaw = await targetDb.raw(`
     SELECT fk.name AS constraint_name,
@@ -148,7 +190,7 @@ async function getMssqlSchema(targetDb) {
     INNER JOIN sys.tables tr ON fkc.referenced_object_id = tr.object_id
     INNER JOIN sys.columns cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id
   `);
-  const fks = fkRaw[0] || fkRaw.rows || fkRaw;
+  const fks = toRows(fkRaw);
 
   const uniqueRaw = await targetDb.raw(`
     SELECT tc.TABLE_NAME AS table_name, kcu.COLUMN_NAME AS column_name
@@ -157,7 +199,7 @@ async function getMssqlSchema(targetDb) {
       ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
     WHERE tc.CONSTRAINT_TYPE = 'UNIQUE'
   `);
-  const uniques = uniqueRaw[0] || uniqueRaw.rows || uniqueRaw;
+  const uniques = toRows(uniqueRaw);
 
   let rowCounts = {};
   try {
@@ -166,26 +208,38 @@ async function getMssqlSchema(targetDb) {
       FROM sys.tables t JOIN sys.partitions p ON t.object_id = p.object_id
       WHERE p.index_id IN (0, 1) GROUP BY t.name
     `);
-    (rcRaw[0] || rcRaw.rows || rcRaw).forEach((r) => { rowCounts[r.table_name] = parseInt(r.row_count) || 0; });
+    toRows(rcRaw).forEach((r) => {
+      const tn = getRowVal(r, 'table_name', 'TABLE_NAME');
+      const rc = getRowVal(r, 'row_count', 'row_count');
+      if (tn) rowCounts[tn] = parseInt(rc) || 0;
+    });
   } catch { /* ignore */ }
 
-  const pkSet = new Set(pks.map((r) => `${r.table_name}.${r.column_name}`));
-  const uniqueSet = new Set(uniques.map((r) => `${r.table_name}.${r.column_name}`));
-  const fkSourceSet = new Set(fks.map((fk) => `${fk.source_table}.${fk.source_column}`));
+  const pkSet = new Set(pks.map((r) => `${getRowVal(r, 'table_name', 'TABLE_NAME')}.${getRowVal(r, 'column_name', 'COLUMN_NAME')}`));
+  const uniqueSet = new Set(uniques.map((r) => `${getRowVal(r, 'table_name', 'TABLE_NAME')}.${getRowVal(r, 'column_name', 'COLUMN_NAME')}`));
+  const fkSourceSet = new Set(fks.map((fk) => `${getRowVal(fk, 'source_table')}.${getRowVal(fk, 'source_column')}`));
 
   const columnsByTable = {};
   cols.forEach((c) => {
-    if (!columnsByTable[c.table_name]) columnsByTable[c.table_name] = [];
-    let type = c.data_type;
-    if (c.char_max_len && c.char_max_len > 0) type += `(${c.char_max_len})`;
-    else if (c.num_prec) type += `(${c.num_prec})`;
-    columnsByTable[c.table_name].push({
-      name: c.column_name, type, nullable: c.is_nullable === 'YES',
-      hasDefault: !!c.column_default,
-      isPrimaryKey: pkSet.has(`${c.table_name}.${c.column_name}`),
-      isUnique: uniqueSet.has(`${c.table_name}.${c.column_name}`),
-      isForeignKey: fkSourceSet.has(`${c.table_name}.${c.column_name}`),
-      position: c.ordinal_position,
+    const tn = getRowVal(c, 'table_name', 'TABLE_NAME');
+    if (!tn) return;
+    if (!columnsByTable[tn]) columnsByTable[tn] = [];
+    let type = getRowVal(c, 'data_type', 'DATA_TYPE') || 'unknown';
+    const charMax = getRowVal(c, 'char_max_len', 'CHARACTER_MAXIMUM_LENGTH');
+    const numPrec = getRowVal(c, 'num_prec', 'NUMERIC_PRECISION');
+    if (charMax && charMax > 0) type += `(${charMax})`;
+    else if (numPrec) type += `(${numPrec})`;
+    const colName = getRowVal(c, 'column_name', 'COLUMN_NAME');
+    const isNullable = (getRowVal(c, 'is_nullable', 'IS_NULLABLE') || '').toUpperCase() === 'YES';
+    const hasDefault = !!getRowVal(c, 'column_default', 'COLUMN_DEFAULT');
+    const pos = getRowVal(c, 'ordinal_position', 'ORDINAL_POSITION');
+    columnsByTable[tn].push({
+      name: colName, type, nullable: isNullable,
+      hasDefault,
+      isPrimaryKey: pkSet.has(`${tn}.${colName}`),
+      isUnique: uniqueSet.has(`${tn}.${colName}`),
+      isForeignKey: fkSourceSet.has(`${tn}.${colName}`),
+      position: pos,
     });
   });
 
@@ -194,9 +248,9 @@ async function getMssqlSchema(targetDb) {
   }));
 
   const relationships = fks.map((fk) => ({
-    name: fk.constraint_name,
-    sourceTable: fk.source_table, sourceColumn: fk.source_column,
-    targetTable: fk.target_table, targetColumn: fk.target_column,
+    name: getRowVal(fk, 'constraint_name'),
+    sourceTable: getRowVal(fk, 'source_table'), sourceColumn: getRowVal(fk, 'source_column'),
+    targetTable: getRowVal(fk, 'target_table'), targetColumn: getRowVal(fk, 'target_column'),
   }));
 
   return {

@@ -2,7 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { useQuery } from '@tanstack/react-query';
 import { useDashboardStore } from '../store/dashboardStore';
-import { queryApi } from '../services/api';
+import { queryApi, sqlApi } from '../services/api';
 import { buildQueryPayload, isWidgetConfigured, getDrillHierarchy } from '../utils/helpers';
 import WidgetRenderer from './WidgetRenderer';
 import SlicerWidget from './SlicerWidget';
@@ -31,9 +31,18 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
 
   const configured = isWidgetConfigured(widget);
 
+  const isSqlWidget = effectiveConfig?.type === 'sql';
+
   const { data, isLoading } = useQuery({
     queryKey: ['widget-data', widget.id, queryPayload, drillState],
-    queryFn: () => queryApi.execute(queryPayload).then((r) => r.data.data),
+    queryFn: async () => {
+      if (isSqlWidget) {
+        const res = await sqlApi.execute(queryPayload.sql, queryPayload.connection_id);
+        return res.data.data?.rows || [];
+      }
+      const res = await queryApi.execute(queryPayload);
+      return res.data.data;
+    },
     enabled: configured && !!queryPayload && widget.type !== 'slicer',
     staleTime: 30000,
   });

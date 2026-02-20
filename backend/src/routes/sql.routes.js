@@ -2,6 +2,14 @@ const router = require('express').Router();
 const { getConnection, getTablesForConnection, getDbConfig } = require('../config/connectionManager');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 
+function toRows(result) {
+  if (!result) return [];
+  if (Array.isArray(result)) return result;
+  if (result.rows) return result.rows;
+  if (result[0]) return Array.isArray(result[0]) ? result[0] : result;
+  return [];
+}
+
 const FORBIDDEN_PATTERNS = [
   /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|EXEC|EXECUTE)\b/i,
   /;\s*(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)/i,
@@ -43,18 +51,14 @@ router.post('/execute', authenticate, authorize('admin', 'analyst'), async (req,
     const result = await targetDb.raw(wrappedSql).timeout(QUERY_TIMEOUT);
     const elapsed = Date.now() - startTime;
 
-    let rows, fields;
-    if (dbType === 'postgresql') {
-      rows = result.rows || [];
-      fields = result.fields
-        ? result.fields.map((f) => ({ name: f.name, dataTypeID: f.dataTypeID }))
-        : rows.length > 0 ? Object.keys(rows[0]).map((name) => ({ name })) : [];
-    } else if (dbType === 'mssql') {
-      rows = result[0] || result.rows || [];
-      fields = rows.length > 0 ? Object.keys(rows[0]).map((name) => ({ name })) : [];
-    } else {
-      rows = result[0] || result.rows || [];
-      fields = rows.length > 0 ? Object.keys(rows[0]).map((name) => ({ name })) : [];
+    const rows = toRows(result);
+    let fields = [];
+    if (result?.fields?.length) {
+      fields = result.fields.map((f) => ({ name: f.name || f.Name, dataTypeID: f.dataTypeID }));
+    }
+    if (fields.length === 0 && rows.length > 0 && typeof rows[0] === 'object') {
+      const first = rows[0];
+      fields = Object.keys(first).map((name) => ({ name }));
     }
 
     res.json({

@@ -3,7 +3,7 @@ const db = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { v4: uuidv4 } = require('uuid');
 
-router.get('/', authenticate, authorize('admin', 'analyst', 'viewer'), async (req, res, next) => {
+router.get('/', authenticate, authorize('admin', 'analyst'), async (req, res, next) => {
   try {
     const dashboards = await db('dashboards')
       .leftJoin('users', 'dashboards.created_by', 'users.id')
@@ -22,7 +22,7 @@ router.get('/', authenticate, authorize('admin', 'analyst', 'viewer'), async (re
   } catch (err) { next(err); }
 });
 
-router.get('/:id', authenticate, authorize('admin', 'analyst', 'viewer'), async (req, res, next) => {
+router.get('/:id', authenticate, authorize('admin', 'analyst'), async (req, res, next) => {
   try {
     const dashboard = await db('dashboards')
       .leftJoin('users', 'dashboards.created_by', 'users.id')

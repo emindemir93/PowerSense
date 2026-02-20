@@ -152,11 +152,18 @@ export default function BuilderPage() {
       for (const w of widgets) {
         if (w.type === 'slicer') continue;
         try {
-          const queryPayload = { source: w.data_config?.source, dimensions: w.data_config?.dimensions || [], measures: w.data_config?.measures || [], limit: w.data_config?.limit || 1000 };
-          if (!queryPayload.source) continue;
-          const { queryApi } = await import('../services/api');
-          const res = await queryApi.execute(queryPayload);
-          const data = res.data.data || [];
+          let data;
+          if (w.data_config?.type === 'sql' && w.data_config?.sql) {
+            const { sqlApi } = await import('../services/api');
+            const res = await sqlApi.execute(w.data_config.sql, w.data_config.connection_id);
+            data = res.data.data?.rows || [];
+          } else {
+            const queryPayload = { source: w.data_config?.source, dimensions: w.data_config?.dimensions || [], measures: w.data_config?.measures || [], limit: w.data_config?.limit || 1000 };
+            if (!queryPayload.source) continue;
+            const { queryApi } = await import('../services/api');
+            const res = await queryApi.execute(queryPayload);
+            data = res.data.data || [];
+          }
           if (data.length > 0) {
             const ws = XLSX.utils.json_to_sheet(data);
             const sheetName = (w.title || 'Sheet').substring(0, 31).replace(/[[\]*?/\\]/g, '');

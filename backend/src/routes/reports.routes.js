@@ -2,6 +2,7 @@ const router = require('express').Router();
 const db = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { v4: uuidv4 } = require('uuid');
+const { getConnection, getDbConfig } = require('../config/connectionManager');
 
 // GET /api/reports - List reports
 router.get('/', authenticate, authorize('admin', 'analyst', 'viewer'), async (req, res, next) => {
@@ -105,14 +106,33 @@ router.post('/:id/run', authenticate, authorize('admin', 'analyst', 'viewer'), a
       ? JSON.parse(report.query_config)
       : report.query_config;
 
-    // Execute via the query API internally
-    const { default: axios } = require('axios');
-    const token = req.headers.authorization;
-    const baseUrl = `http://localhost:${process.env.PORT || 4000}`;
-
-    const queryRes = await axios.post(`${baseUrl}/api/query`, queryConfig, {
-      headers: { Authorization: token, 'Content-Type': 'application/json' },
-    });
+    let queryRes;
+    if (queryConfig.type === 'sql') {
+      const trimmed = queryConfig.sql?.trim().replace(/;+$/, '') || '';
+      if (!trimmed || !/^\s*(SELECT|WITH)\b/i.test(trimmed)) {
+        return res.status(400).json({ success: false, message: 'Invalid SQL in report' });
+      }
+      const { db: targetDb, dbType } = await getConnection(queryConfig.connection_id);
+      const config = getDbConfig(dbType);
+      const wrappedSql = config.wrapLimit(trimmed, 5000);
+      const result = await targetDb.raw(wrappedSql).timeout(30000);
+      const toRows = (r) => {
+        if (!r) return [];
+        if (Array.isArray(r)) return r;
+        if (r.rows) return r.rows;
+        if (r[0]) return Array.isArray(r[0]) ? r[0] : [r[0]];
+        return [];
+      };
+      const rows = toRows(result);
+      queryRes = { data: { data: rows }, meta: { total: rows.length } };
+    } else {
+      const { default: axios } = require('axios');
+      const token = req.headers.authorization;
+      const baseUrl = `http://localhost:${process.env.PORT || 4000}`;
+      queryRes = await axios.post(`${baseUrl}/api/query`, queryConfig, {
+        headers: { Authorization: token, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Update run stats
     await db('reports').where('id', req.params.id).update({
@@ -144,15 +164,33 @@ router.get('/:id/export', authenticate, authorize('admin', 'analyst', 'viewer'),
       ? JSON.parse(report.query_config)
       : report.query_config;
 
-    const { default: axios } = require('axios');
-    const token = req.headers.authorization;
-    const baseUrl = `http://localhost:${process.env.PORT || 4000}`;
-
-    const queryRes = await axios.post(`${baseUrl}/api/query`, queryConfig, {
-      headers: { Authorization: token, 'Content-Type': 'application/json' },
-    });
-
-    const data = queryRes.data.data || [];
+    let data;
+    if (queryConfig.type === 'sql') {
+      const trimmed = queryConfig.sql?.trim().replace(/;+$/, '') || '';
+      if (!trimmed || !/^\s*(SELECT|WITH)\b/i.test(trimmed)) {
+        return res.status(400).json({ success: false, message: 'Invalid SQL in report' });
+      }
+      const { db: targetDb, dbType } = await getConnection(queryConfig.connection_id);
+      const config = getDbConfig(dbType);
+      const wrappedSql = config.wrapLimit(trimmed, 5000);
+      const result = await targetDb.raw(wrappedSql).timeout(30000);
+      const toRows = (r) => {
+        if (!r) return [];
+        if (Array.isArray(r)) return r;
+        if (r.rows) return r.rows;
+        if (r[0]) return Array.isArray(r[0]) ? r[0] : [r[0]];
+        return [];
+      };
+      data = toRows(result);
+    } else {
+      const { default: axios } = require('axios');
+      const token = req.headers.authorization;
+      const baseUrl = `http://localhost:${process.env.PORT || 4000}`;
+      const queryRes = await axios.post(`${baseUrl}/api/query`, queryConfig, {
+        headers: { Authorization: token, 'Content-Type': 'application/json' },
+      });
+      data = queryRes.data.data || [];
+    }
     if (data.length === 0) {
       return res.status(200).send('No data');
     }

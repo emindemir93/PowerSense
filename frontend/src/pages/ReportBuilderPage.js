@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryApi, reportsApi } from '../services/api';
+import { queryApi, reportsApi, savedQueriesApi, sqlApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { formatAxisValue } from '../utils/helpers';
 
@@ -24,6 +24,10 @@ export default function ReportBuilderPage() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [queryType, setQueryType] = useState('visual'); // 'visual' | 'sql'
+  const [savedQueryId, setSavedQueryId] = useState('');
+  const [sqlQuery, setSqlQuery] = useState(''); // for existing reports with sql not in saved list
+  const [sqlConnectionId, setSqlConnectionId] = useState('');
   const [source, setSource] = useState('');
   const [dimensions, setDimensions] = useState([]);
   const [measures, setMeasures] = useState([]);
@@ -37,6 +41,12 @@ export default function ReportBuilderPage() {
   const { data: schema } = useQuery({
     queryKey: ['query-schema'],
     queryFn: () => queryApi.schema().then((r) => r.data.data),
+  });
+
+  const { data: savedQueries = [] } = useQuery({
+    queryKey: ['saved-queries'],
+    queryFn: () => savedQueriesApi.list().then((r) => r.data.data),
+    enabled: canEdit,
   });
 
   const { data: existingReport } = useQuery({
@@ -55,17 +65,34 @@ export default function ReportBuilderPage() {
         ? JSON.parse(existingReport.query_config)
         : existingReport.query_config;
       if (qc) {
-        setSource(qc.source || '');
-        setDimensions(qc.dimensions || []);
-        setMeasures(qc.measures || []);
-        setLimit(qc.limit || 100);
+        if (qc.type === 'sql') {
+          setQueryType('sql');
+          setSqlQuery(qc.sql || '');
+          setSqlConnectionId(qc.connection_id || '');
+          setSavedQueryId('__custom__');
+        } else {
+          setQueryType('visual');
+          setSource(qc.source || '');
+          setDimensions(qc.dimensions || []);
+          setMeasures(qc.measures || []);
+          setLimit(qc.limit || 100);
+        }
       }
     }
   }, [existingReport]);
 
   const sourceSchema = schema?.[source];
 
+  const selectedSavedQuery = savedQueryId && savedQueryId !== '__custom__' ? savedQueries.find((sq) => sq.id === savedQueryId) : null;
+  const sqlPayload = selectedSavedQuery
+    ? { sql: selectedSavedQuery.sql, connection_id: selectedSavedQuery.connection_id }
+    : (savedQueryId === '__custom__' || sqlQuery ? { sql: sqlQuery, connection_id: sqlConnectionId } : null);
+
   const queryPayload = useMemo(() => {
+    if (queryType === 'sql') {
+      if (!sqlPayload?.sql) return null;
+      return { type: 'sql', sql: sqlPayload.sql, connection_id: sqlPayload.connection_id };
+    }
     if (!source || (dimensions.length === 0 && measures.length === 0)) return null;
     return {
       source,
@@ -77,14 +104,20 @@ export default function ReportBuilderPage() {
       })),
       limit: parseInt(limit) || 100,
     };
-  }, [source, dimensions, measures, limit]);
+  }, [queryType, sqlPayload, source, dimensions, measures, limit]);
 
   const handlePreview = async () => {
     if (!queryPayload) return;
     setPreviewLoading(true);
     try {
-      const res = await queryApi.execute(queryPayload);
-      setPreviewData(res.data.data);
+      if (queryPayload.type === 'sql') {
+        const res = await sqlApi.execute(queryPayload.sql, queryPayload.connection_id);
+        const data = res.data.data;
+        setPreviewData(data.rows || []);
+      } else {
+        const res = await queryApi.execute(queryPayload);
+        setPreviewData(res.data.data);
+      }
     } catch (err) {
       setPreviewData([]);
     } finally {
@@ -106,10 +139,13 @@ export default function ReportBuilderPage() {
 
   const handleSave = () => {
     if (!name.trim()) return;
+    const qc = queryType === 'sql' && sqlPayload
+      ? { type: 'sql', sql: sqlPayload.sql, connection_id: sqlPayload.connection_id || null }
+      : queryPayload;
     saveMutation.mutate({
       name: name.trim(),
       description: description.trim(),
-      query_config: queryPayload,
+      query_config: qc,
       is_public: isPublic,
       schedule: schedule || null,
     });
@@ -239,7 +275,38 @@ export default function ReportBuilderPage() {
           <div className="divider" />
 
           <div className="config-section">
-            <div className="config-section-title">1. Data Source</div>
+            <div className="config-section-title">1. Query Type</div>
+            <div className="form-group">
+              <select className="form-select" value={queryType} onChange={(e) => { setQueryType(e.target.value); setPreviewData(null); }}>
+                <option value="visual">Visual Builder</option>
+                <option value="sql">Saved Query</option>
+              </select>
+            </div>
+          </div>
+
+          {queryType === 'sql' && (
+            <div className="config-section">
+              <div className="config-section-title">2. Select Saved Query</div>
+              <div className="form-group">
+                <select className="form-select" value={savedQueryId} onChange={(e) => { const v = e.target.value; setSavedQueryId(v); if (v !== '__custom__') { setSqlQuery(''); setSqlConnectionId(''); } setPreviewData(null); }}>
+                  <option value="">Select a saved query...</option>
+                  {sqlQuery && <option value="__custom__">Custom SQL (from report)</option>}
+                  {savedQueries.map((sq) => (
+                    <option key={sq.id} value={sq.id}>{sq.name}</option>
+                  ))}
+                </select>
+                {savedQueries.length === 0 && (
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                    No saved queries. Go to SQL Editor, write a query, and click "Save Query" first.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {queryType === 'visual' && (
+          <div className="config-section">
+            <div className="config-section-title">2. Data Source</div>
             <div className="form-group">
               <select className="form-select" value={source} onChange={(e) => handleSourceChange(e.target.value)}>
                 <option value="">Select data source...</option>
@@ -249,11 +316,12 @@ export default function ReportBuilderPage() {
               </select>
             </div>
           </div>
+          )}
 
-          {sourceSchema && (
+          {queryType === 'visual' && sourceSchema && (
             <>
               <div className="config-section">
-                <div className="config-section-title">2. Dimensions (Group By)</div>
+                <div className="config-section-title">3. Dimensions (Group By)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {sourceSchema.dimensions.map((dim) => (
                     <label key={dim.key} className="form-checkbox">
@@ -270,7 +338,7 @@ export default function ReportBuilderPage() {
 
               <div className="config-section">
                 <div className="config-section-title">
-                  3. Measures (Aggregations)
+                  4. Measures (Aggregations)
                   <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '2px 8px' }} onClick={addMeasure}>+ Add</button>
                 </div>
                 {measures.map((m, i) => (
@@ -300,7 +368,7 @@ export default function ReportBuilderPage() {
               </div>
 
               <div className="config-section">
-                <div className="config-section-title">4. Options</div>
+                <div className="config-section-title">5. Options</div>
                 <div className="form-group">
                   <label className="form-label">Row Limit</label>
                   <input className="form-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} min={1} max={10000} />

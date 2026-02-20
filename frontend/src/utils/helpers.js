@@ -74,7 +74,9 @@ export function truncateLabel(label, maxLen = 20) {
 }
 
 export function buildQueryPayload(dataConfig, crossFilters = [], dateRange = null) {
-  if (!dataConfig || !dataConfig.source) return null;
+  if (!dataConfig) return null;
+  if (dataConfig.type === 'sql') return dataConfig;
+  if (!dataConfig.source) return null;
 
   const payload = {
     source: dataConfig.source,
@@ -110,6 +112,7 @@ export function isWidgetConfigured(widget) {
     return dc?.source && dc?.slicerField;
   }
   const dc = widget?.data_config;
+  if (dc?.type === 'sql' && dc?.sql) return true;
   if (!dc || !dc.source) return false;
   if ((!dc.dimensions || dc.dimensions.length === 0) && (!dc.measures || dc.measures.length === 0)) return false;
   return true;

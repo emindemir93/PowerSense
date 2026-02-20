@@ -1,21 +1,38 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { queryApi } from '../services/api';
+import { queryApi, savedQueriesApi, sqlApi } from '../services/api';
 import { formatAxisValue } from '../utils/helpers';
+import { useAuthStore } from '../store/authStore';
 
 export default function DataExplorerPage() {
+  const user = useAuthStore((s) => s.user);
+  const canUseSql = user?.role === 'admin' || user?.role === 'analyst';
+
+  const [mode, setMode] = useState('visual'); // 'visual' | 'sql'
   const [source, setSource] = useState('');
   const [selectedDims, setSelectedDims] = useState([]);
   const [selectedMeasures, setSelectedMeasures] = useState([]);
   const [limit, setLimit] = useState(100);
+  const [savedQueryId, setSavedQueryId] = useState('');
   const [hasQueried, setHasQueried] = useState(false);
+  const [sqlResult, setSqlResult] = useState(null);
+  const [sqlLoading, setSqlLoading] = useState(false);
 
   const { data: schema } = useQuery({
     queryKey: ['query-schema'],
     queryFn: () => queryApi.schema().then((r) => r.data.data),
   });
 
+  const { data: savedQueries = [] } = useQuery({
+    queryKey: ['saved-queries'],
+    queryFn: () => savedQueriesApi.list().then((r) => r.data.data),
+    enabled: canUseSql,
+  });
+
+  const selectedSavedQuery = savedQueries.find((sq) => sq.id === savedQueryId);
+
   const queryPayload = useMemo(() => {
+    if (mode === 'sql') return null;
     if (!source || (selectedDims.length === 0 && selectedMeasures.length === 0)) return null;
     return {
       source,
@@ -26,7 +43,7 @@ export default function DataExplorerPage() {
       }),
       limit: parseInt(limit) || 100,
     };
-  }, [source, selectedDims, selectedMeasures, limit, schema]);
+  }, [mode, source, selectedDims, selectedMeasures, limit, schema]);
 
   const { data: result, isLoading, refetch } = useQuery({
     queryKey: ['explore', queryPayload],
@@ -34,9 +51,22 @@ export default function DataExplorerPage() {
     enabled: false,
   });
 
-  const handleRun = () => {
-    if (queryPayload) {
+  const handleRun = async () => {
+    if (mode === 'sql' && selectedSavedQuery) {
       setHasQueried(true);
+      setSqlLoading(true);
+      setSqlResult(null);
+      try {
+        const res = await sqlApi.execute(selectedSavedQuery.sql, selectedSavedQuery.connection_id);
+        setSqlResult(res.data.data?.rows || []);
+      } catch {
+        setSqlResult([]);
+      } finally {
+        setSqlLoading(false);
+      }
+    } else if (queryPayload) {
+      setHasQueried(true);
+      setSqlResult(null);
       refetch();
     }
   };
@@ -54,8 +84,13 @@ export default function DataExplorerPage() {
   const toggleMeasure = (m) => setSelectedMeasures((p) => p.includes(m) ? p.filter((x) => x !== m) : [...p, m]);
 
   const columns = useMemo(() => {
+    if (mode === 'sql' && sqlResult?.length > 0) return Object.keys(sqlResult[0]);
     return [...selectedDims, ...selectedMeasures];
-  }, [selectedDims, selectedMeasures]);
+  }, [mode, sqlResult, selectedDims, selectedMeasures]);
+
+  const displayResult = mode === 'sql' ? sqlResult : result;
+  const displayLoading = mode === 'sql' ? sqlLoading : isLoading;
+  const canRun = mode === 'sql' ? !!selectedSavedQuery : !!queryPayload;
 
   return (
     <div className="content-area">
@@ -65,6 +100,27 @@ export default function DataExplorerPage() {
       </div>
 
       <div className="explorer-controls">
+        {canUseSql && (
+          <select className="form-select" style={{ width: 140 }} value={mode} onChange={(e) => { setMode(e.target.value); setHasQueried(false); setSqlResult(null); }}>
+            <option value="visual">Visual Builder</option>
+            <option value="sql">Saved Query</option>
+          </select>
+        )}
+
+        {mode === 'sql' ? (
+          <>
+            <select className="form-select" style={{ width: 220 }} value={savedQueryId} onChange={(e) => { setSavedQueryId(e.target.value); setHasQueried(false); setSqlResult(null); }}>
+              <option value="">Select saved query...</option>
+              {savedQueries.map((sq) => (
+                <option key={sq.id} value={sq.id}>{sq.name}</option>
+              ))}
+            </select>
+            {savedQueries.length === 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No saved queries. Use SQL Editor to save one.</span>
+            )}
+          </>
+        ) : (
+          <>
         <select className="form-select" style={{ width: 200 }} value={source} onChange={(e) => handleSourceChange(e.target.value)}>
           <option value="">Select source...</option>
           {schema && Object.entries(schema).map(([key, val]) => (
@@ -96,21 +152,24 @@ export default function DataExplorerPage() {
         )}
 
         <input className="form-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} style={{ width: 80 }} min={1} max={10000} placeholder="Limit" />
-        <button className="btn btn-primary btn-sm" onClick={handleRun} disabled={!queryPayload || isLoading}>
-          {isLoading ? 'Running...' : 'Run Query'}
+          </>
+        )}
+
+        <button className="btn btn-primary btn-sm" onClick={handleRun} disabled={!canRun || displayLoading}>
+          {displayLoading ? 'Running...' : 'Run Query'}
         </button>
       </div>
 
-      {isLoading && (
+      {displayLoading && (
         <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
           <div className="loading-spinner" />
         </div>
       )}
 
-      {hasQueried && result && (
+      {hasQueried && displayResult && displayResult.length > 0 && (
         <>
           <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
-            {result.length} rows returned
+            {displayResult.length} rows returned
           </div>
           <div className="explorer-table-wrap">
             <table className="widget-table">
@@ -122,13 +181,18 @@ export default function DataExplorerPage() {
                 </tr>
               </thead>
               <tbody>
-                {result.map((row, i) => (
+                {displayResult.map((row, i) => (
                   <tr key={i}>
-                    {columns.map((col) => (
-                      <td key={col} style={{ fontVariantNumeric: selectedMeasures.includes(col) ? 'tabular-nums' : undefined, textAlign: selectedMeasures.includes(col) ? 'right' : 'left' }}>
-                        {selectedMeasures.includes(col) ? formatAxisValue(row[col]) : (row[col] ?? '-')}
-                      </td>
-                    ))}
+                    {columns.map((col) => {
+                      const key = Object.keys(row).find((k) => k.toLowerCase() === col.toLowerCase()) || col;
+                      const val = row[key];
+                      const isNumeric = typeof val === 'number' || (typeof val === 'string' && /^-?\d+\.?\d*$/.test(val));
+                      return (
+                        <td key={col} style={{ fontVariantNumeric: isNumeric ? 'tabular-nums' : undefined, textAlign: isNumeric ? 'right' : 'left' }}>
+                          {isNumeric ? formatAxisValue(val) : (val ?? '-')}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -137,7 +201,7 @@ export default function DataExplorerPage() {
         </>
       )}
 
-      {hasQueried && result && result.length === 0 && (
+      {hasQueried && displayResult && displayResult.length === 0 && (
         <div className="empty-state">
           <h3>No Results</h3>
           <p>Try adjusting your query parameters</p>

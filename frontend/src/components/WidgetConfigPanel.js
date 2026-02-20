@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { queryApi } from '../services/api';
+import { queryApi, savedQueriesApi } from '../services/api';
 import { useDashboardStore } from '../store/dashboardStore';
 import { WIDGET_TYPES } from '../utils/helpers';
 
@@ -34,6 +34,10 @@ export default function WidgetConfigPanel({ widget, onClose }) {
 
   const [title, setTitle] = useState(widget?.title || '');
   const [type, setType] = useState(widget?.type || 'bar');
+  const [dataSourceType, setDataSourceType] = useState(widget?.data_config?.type === 'sql' ? 'sql' : 'visual');
+  const [savedQueryId, setSavedQueryId] = useState(widget?.data_config?.saved_query_id || '');
+  const [sqlDimColumn, setSqlDimColumn] = useState(widget?.data_config?.sqlDimColumn || '');
+  const [sqlMeasureColumn, setSqlMeasureColumn] = useState(widget?.data_config?.sqlMeasureColumn || '');
   const [source, setSource] = useState(widget?.data_config?.source || '');
   const [dimensions, setDimensions] = useState(widget?.data_config?.dimensions || []);
   const [measures, setMeasures] = useState(widget?.data_config?.measures || []);
@@ -49,10 +53,19 @@ export default function WidgetConfigPanel({ widget, onClose }) {
     queryFn: () => queryApi.schema().then((r) => r.data.data),
   });
 
+  const { data: savedQueries = [] } = useQuery({
+    queryKey: ['saved-queries'],
+    queryFn: () => savedQueriesApi.list().then((r) => r.data.data),
+  });
+
   useEffect(() => {
     if (widget) {
       setTitle(widget.title || '');
       setType(widget.type || 'bar');
+      setDataSourceType(widget.data_config?.type === 'sql' ? 'sql' : 'visual');
+      setSavedQueryId(widget.data_config?.saved_query_id || '');
+      setSqlDimColumn(widget.data_config?.sqlDimColumn || '');
+      setSqlMeasureColumn(widget.data_config?.sqlMeasureColumn || '');
       setSource(widget.data_config?.source || '');
       setDimensions(widget.data_config?.dimensions || []);
       setMeasures(widget.data_config?.measures || []);
@@ -75,11 +88,24 @@ export default function WidgetConfigPanel({ widget, onClose }) {
   const isPivot = type === 'pivot';
   const showCondFormatting = isKpi || isTable || isPivot;
 
+  const selectedSavedQuery = savedQueries.find((sq) => sq.id === savedQueryId);
+
   const applyChanges = () => {
-    updateWidget(widget.id, {
-      title,
-      type,
-      data_config: {
+    let dataConfig;
+    if (dataSourceType === 'sql' && selectedSavedQuery) {
+      dataConfig = {
+        type: 'sql',
+        sql: selectedSavedQuery.sql,
+        connection_id: selectedSavedQuery.connection_id,
+        saved_query_id: savedQueryId,
+        sqlDimColumn,
+        sqlMeasureColumn,
+        dimensions: sqlDimColumn ? [sqlDimColumn] : [],
+        measures: sqlMeasureColumn ? [{ field: sqlMeasureColumn, alias: sqlMeasureColumn, aggregation: 'sum' }] : [],
+        limit: parseInt(limit) || 100,
+      };
+    } else {
+      dataConfig = {
         source,
         dimensions,
         measures,
@@ -87,7 +113,12 @@ export default function WidgetConfigPanel({ widget, onClose }) {
         ...(isSlicer && { slicerField }),
         ...(widget.data_config?.filters && { filters: widget.data_config.filters }),
         ...(widget.data_config?.sort && { sort: widget.data_config.sort }),
-      },
+      };
+    }
+    updateWidget(widget.id, {
+      title,
+      type,
+      data_config: dataConfig,
       visual_config: {
         ...widget.visual_config,
         format,
@@ -167,19 +198,69 @@ export default function WidgetConfigPanel({ widget, onClose }) {
           </div>
         </div>
 
-        {/* Data Source */}
+        {/* Data Source Type */}
         <div className="config-section">
           <div className="config-section-title">Data Source</div>
           <div className="form-group">
-            <select className="form-select" value={source} onChange={(e) => handleSourceChange(e.target.value)}>
-              <option value="">Select a data source...</option>
-              {schema && Object.entries(schema).map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
+            <select className="form-select" value={dataSourceType} onChange={(e) => setDataSourceType(e.target.value)}>
+              <option value="visual">Visual Builder</option>
+              <option value="sql">Saved Query</option>
             </select>
           </div>
         </div>
 
+        {/* Saved Query Config */}
+        {dataSourceType === 'sql' && (
+          <div className="config-section">
+            <div className="config-section-title">Saved Query</div>
+            <div className="form-group">
+              <select className="form-select" value={savedQueryId} onChange={(e) => setSavedQueryId(e.target.value)}>
+                <option value="">Select a saved query...</option>
+                {savedQueries.map((sq) => (
+                  <option key={sq.id} value={sq.id}>{sq.name}</option>
+                ))}
+              </select>
+              {savedQueries.length === 0 && (
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>No saved queries. Use SQL Editor to save one.</p>
+              )}
+            </div>
+            {selectedSavedQuery && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Dimension Column (X axis / labels)</label>
+                  <input className="form-input" value={sqlDimColumn} onChange={(e) => setSqlDimColumn(e.target.value)}
+                    placeholder="e.g. category, month, name..." style={{ fontSize: 12 }} />
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Column name from query result for grouping</span>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Measure Column (Y axis / values)</label>
+                  <input className="form-input" value={sqlMeasureColumn} onChange={(e) => setSqlMeasureColumn(e.target.value)}
+                    placeholder="e.g. total, count, revenue..." style={{ fontSize: 12 }} />
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Column name from query result for values</span>
+                </div>
+                <div style={{ marginTop: 4, padding: 8, background: 'var(--bg-elevated)', borderRadius: 6, fontSize: 11, fontFamily: 'monospace', color: 'var(--text-muted)', maxHeight: 60, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  {selectedSavedQuery.sql?.substring(0, 150)}{selectedSavedQuery.sql?.length > 150 ? '...' : ''}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Visual Builder Source */}
+        {dataSourceType === 'visual' && (
+          <div className="config-section">
+            <div className="config-section-title">Source</div>
+            <div className="form-group">
+              <select className="form-select" value={source} onChange={(e) => handleSourceChange(e.target.value)}>
+                <option value="">Select a data source...</option>
+                {schema && Object.entries(schema).map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Slicer Config */}
-        {isSlicer && sourceSchema && (
+        {dataSourceType === 'visual' && isSlicer && sourceSchema && (
           <div className="config-section">
             <div className="config-section-title">Slicer Field</div>
             <div className="form-group">
@@ -192,7 +273,7 @@ export default function WidgetConfigPanel({ widget, onClose }) {
         )}
 
         {/* Dimensions & Measures for non-slicer */}
-        {!isSlicer && sourceSchema && (
+        {dataSourceType === 'visual' && !isSlicer && sourceSchema && (
           <>
             <div className="config-section">
               <div className="config-section-title">Dimensions (Group By)</div>

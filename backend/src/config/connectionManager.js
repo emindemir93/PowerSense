@@ -3,6 +3,20 @@ const appDb = require('./database');
 
 const pools = new Map();
 
+function injectMssqlTop(sql, max) {
+  const trimmed = sql.trim();
+  if (/\bSELECT\s+TOP\s+\d+/i.test(trimmed)) {
+    return trimmed.replace(/\bSELECT\s+TOP\s+\d+/i, `SELECT TOP ${max}`);
+  }
+  if (/\bSELECT\s+DISTINCT\s+TOP\s+\d+/i.test(trimmed)) {
+    return trimmed.replace(/\bSELECT\s+DISTINCT\s+TOP\s+\d+/i, `SELECT DISTINCT TOP ${max}`);
+  }
+  if (/\bSELECT\s+DISTINCT\s+/i.test(trimmed)) {
+    return trimmed.replace(/\bSELECT\s+DISTINCT\s+/i, `SELECT DISTINCT TOP ${max} `);
+  }
+  return trimmed.replace(/\bSELECT\s+/i, `SELECT TOP ${max} `);
+}
+
 const DB_CONFIGS = {
   postgresql: {
     client: 'pg',
@@ -51,7 +65,7 @@ const DB_CONFIGS = {
     tableCountQuery: "SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'",
     schemaQuery: null,
     fkQuery: null,
-    wrapLimit: (sql, max) => `SELECT TOP ${max} * FROM (${sql}) AS __result`,
+    wrapLimit: (sql, max) => injectMssqlTop(sql, max),
   },
   mysql: {
     client: 'mysql2',
@@ -86,28 +100,32 @@ function createKnexInstance(conn) {
 }
 
 async function getConnection(connectionId) {
-  if (!connectionId) {
-    const defaultConn = await appDb('data_connections')
-      .where({ is_default: true, is_active: true })
+  try {
+    if (!connectionId) {
+      const defaultConn = await appDb('data_connections')
+        .where({ is_default: true, is_active: true })
+        .first();
+      if (!defaultConn) return { db: appDb, dbType: 'postgresql' };
+      connectionId = defaultConn.id;
+    }
+
+    if (pools.has(connectionId)) {
+      const conn = await appDb('data_connections').where({ id: connectionId }).select('db_type').first();
+      return { db: pools.get(connectionId), dbType: conn?.db_type || 'postgresql' };
+    }
+
+    const conn = await appDb('data_connections')
+      .where({ id: connectionId, is_active: true })
       .first();
-    if (!defaultConn) return { db: appDb, dbType: 'postgresql' };
-    connectionId = defaultConn.id;
+
+    if (!conn) return { db: appDb, dbType: 'postgresql' };
+
+    const instance = createKnexInstance(conn);
+    pools.set(connectionId, instance);
+    return { db: instance, dbType: conn.db_type || 'postgresql' };
+  } catch (err) {
+    return { db: appDb, dbType: 'postgresql' };
   }
-
-  if (pools.has(connectionId)) {
-    const conn = await appDb('data_connections').where({ id: connectionId }).select('db_type').first();
-    return { db: pools.get(connectionId), dbType: conn?.db_type || 'postgresql' };
-  }
-
-  const conn = await appDb('data_connections')
-    .where({ id: connectionId, is_active: true })
-    .first();
-
-  if (!conn) return { db: appDb, dbType: 'postgresql' };
-
-  const instance = createKnexInstance(conn);
-  pools.set(connectionId, instance);
-  return { db: instance, dbType: conn.db_type || 'postgresql' };
 }
 
 async function testConnection(config) {
@@ -145,6 +163,14 @@ async function testConnection(config) {
   }
 }
 
+function toRows(r) {
+  if (!r) return [];
+  if (Array.isArray(r)) return r;
+  if (r.rows) return r.rows;
+  if (r[0]) return Array.isArray(r[0]) ? r[0] : r;
+  return [];
+}
+
 async function getTablesForConnection(connectionId) {
   const { db: targetDb, dbType } = await getConnection(connectionId);
   const config = getDbConfig(dbType);
@@ -153,11 +179,11 @@ async function getTablesForConnection(connectionId) {
     const result = await targetDb.raw(config.schemaQuery);
     const fkResult = await targetDb.raw(config.fkQuery);
     const fkMap = {};
-    for (const fk of fkResult.rows) {
+    for (const fk of toRows(fkResult)) {
       if (!fkMap[fk.from_table]) fkMap[fk.from_table] = [];
       fkMap[fk.from_table].push(fk);
     }
-    return result.rows.map((r) => ({
+    return toRows(result).map((r) => ({
       name: r.table_name,
       columns: r.columns,
       foreignKeys: fkMap[r.table_name] || [],
@@ -169,15 +195,15 @@ async function getTablesForConnection(connectionId) {
       SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
       WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
     `);
-    const tables = (tablesResult.rows || tablesResult[0] || tablesResult).map((r) => r.table_name || r.TABLE_NAME);
+    const tables = toRows(tablesResult).map((r) => r.table_name || r.TABLE_NAME);
 
     const colsResult = await targetDb.raw(`
       SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type,
         IS_NULLABLE AS is_nullable, COLUMN_DEFAULT AS column_default, ORDINAL_POSITION AS ordinal_position
-      FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME IN (${tables.map(() => '?').join(',')})
+      FROM INFORMATION_SCHEMA.COLUMNS
       ORDER BY TABLE_NAME, ORDINAL_POSITION
-    `, tables);
-    const cols = colsResult.rows || colsResult[0] || colsResult;
+    `);
+    const cols = toRows(colsResult);
 
     const fkResult = await targetDb.raw(`
       SELECT fk.name AS constraint_name, tp.name AS from_table, cp.name AS from_column,
@@ -189,7 +215,7 @@ async function getTablesForConnection(connectionId) {
       INNER JOIN sys.tables tr ON fkc.referenced_object_id = tr.object_id
       INNER JOIN sys.columns cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id
     `);
-    const fks = fkResult.rows || fkResult[0] || fkResult;
+    const fks = toRows(fkResult);
 
     const fkMap = {};
     for (const fk of fks) {
@@ -217,8 +243,7 @@ async function getTablesForConnection(connectionId) {
       SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
     `);
-    const tableRows = tablesResult.rows || tablesResult[0] || tablesResult;
-    const tables = tableRows.map((r) => r.table_name || r.TABLE_NAME);
+    const tables = toRows(tablesResult).map((r) => r.table_name || r.TABLE_NAME);
 
     const colsResult = await targetDb.raw(`
       SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type,
@@ -226,7 +251,7 @@ async function getTablesForConnection(connectionId) {
       FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
       ORDER BY TABLE_NAME, ORDINAL_POSITION
     `);
-    const cols = colsResult.rows || colsResult[0] || colsResult;
+    const cols = toRows(colsResult);
 
     const fkResult = await targetDb.raw(`
       SELECT TABLE_NAME AS from_table, COLUMN_NAME AS from_column,
@@ -234,7 +259,7 @@ async function getTablesForConnection(connectionId) {
       FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
       WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL
     `);
-    const fks = fkResult.rows || fkResult[0] || fkResult;
+    const fks = toRows(fkResult);
 
     const colMap = {};
     for (const c of cols) {

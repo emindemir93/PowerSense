@@ -87,9 +87,10 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const visibleItems = navItems.filter(
-    (item) => !item.adminOnly || user?.role === 'admin'
-  );
+  const visibleItems = navItems.filter((item) => {
+    if (!item.adminOnly) return true;
+    return user?.role === 'admin' || (item.path === '/schema' && user?.role === 'analyst');
+  });
 
   return (
     <div className="app-layout">
