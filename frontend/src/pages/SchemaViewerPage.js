@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { schemaApi } from '../services/api';
+import { schemaApi, connectionsApi } from '../services/api';
 
 const TABLE_WIDTH = 260;
 const HEADER_H = 36;
@@ -76,10 +76,18 @@ export default function SchemaViewerPage() {
   const [selectedTable, setSelectedTable] = useState(null);
   const [hoveredRel, setHoveredRel] = useState(null);
   const [search, setSearch] = useState('');
+  const [selectedConnection, setSelectedConnection] = useState('');
+
+  const { data: connections } = useQuery({
+    queryKey: ['connections'],
+    queryFn: () => connectionsApi.list().then((r) => r.data.data),
+  });
+
+  const activeConnectionId = selectedConnection || undefined;
 
   const { data: schema, isLoading, error } = useQuery({
-    queryKey: ['db-schema'],
-    queryFn: () => schemaApi.getSchema().then((r) => r.data.data),
+    queryKey: ['db-schema', activeConnectionId],
+    queryFn: () => schemaApi.getSchema(activeConnectionId).then((r) => r.data.data),
   });
 
   useEffect(() => {
@@ -203,11 +211,29 @@ export default function SchemaViewerPage() {
           <span style={{ fontWeight: 600, fontSize: 15 }}>Database Schema</span>
           {schema && (
             <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              {schema.stats.tableCount} tables &middot; {schema.stats.relationshipCount} relationships &middot; {schema.stats.totalColumns} columns
+              {schema.database && <strong>{schema.database}</strong>}
+              {schema.dbType && <span style={{ marginLeft: 4, background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 10, padding: '1px 5px', borderRadius: 3 }}>{schema.dbType.toUpperCase()}</span>}
+              {' '}&middot; {schema.stats.tableCount} tables &middot; {schema.stats.relationshipCount} relationships &middot; {schema.stats.totalColumns} columns
             </span>
           )}
         </div>
         <div className="toolbar-actions">
+          {connections && connections.length > 0 && (
+            <select
+              value={selectedConnection}
+              onChange={(e) => { setSelectedConnection(e.target.value); setSelectedTable(null); }}
+              style={{
+                background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '4px 8px', color: 'var(--text-primary)',
+                fontSize: 11, height: 30,
+              }}
+            >
+              <option value="">Default Connection</option>
+              {connections.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({(c.db_type || 'pg').toUpperCase()})</option>
+              ))}
+            </select>
+          )}
           <input
             className="form-input"
             placeholder="Search tables or columns..."

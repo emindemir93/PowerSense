@@ -96,7 +96,7 @@ export const queryApi = {
 };
 
 export const schemaApi = {
-  getSchema: () => api.get('/schema'),
+  getSchema: (connectionId) => api.get('/schema', { params: { connectionId } }),
 };
 
 export const bookmarksApi = {
