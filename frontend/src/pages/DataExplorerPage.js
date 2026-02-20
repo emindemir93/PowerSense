@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryApi, savedQueriesApi, sqlApi } from '../services/api';
-import { formatAxisValue } from '../utils/helpers';
+import { formatTableValue } from '../utils/helpers';
 import { useAuthStore } from '../store/authStore';
 import { useTranslation } from '../i18n';
 
@@ -191,7 +191,7 @@ export default function DataExplorerPage() {
                       const isNumeric = typeof val === 'number' || (typeof val === 'string' && /^-?\d+\.?\d*$/.test(val));
                       return (
                         <td key={col} style={{ fontVariantNumeric: isNumeric ? 'tabular-nums' : undefined, textAlign: isNumeric ? 'right' : 'left' }}>
-                          {isNumeric ? formatAxisValue(val) : (val ?? '-')}
+                          {isNumeric ? formatTableValue(val) : (val ?? '-')}
                         </td>
                       );
                     })}

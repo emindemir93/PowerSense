@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sqlApi, connectionsApi, savedQueriesApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { formatAxisValue } from '../utils/helpers';
+import { formatTableValue } from '../utils/helpers';
 import { useTranslation } from '../i18n';
 
 const EXAMPLE_QUERIES = [
@@ -889,7 +889,7 @@ export default function SQLEditorPage() {
                               color: val === null ? 'var(--text-muted)' : undefined,
                               fontStyle: val === null ? 'italic' : undefined,
                             }}>
-                              {val === null ? 'NULL' : isNum ? formatAxisValue(val) : String(val)}
+                              {val === null ? 'NULL' : isNum ? formatTableValue(val) : String(val)}
                             </td>
                           );
                         })}

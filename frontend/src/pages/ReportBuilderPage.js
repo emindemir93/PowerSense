@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryApi, reportsApi, savedQueriesApi, sqlApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { formatAxisValue } from '../utils/helpers';
+import { formatTableValue } from '../utils/helpers';
 import { useTranslation } from '../i18n';
 
 const AGG_OPTIONS = [
@@ -434,7 +434,7 @@ export default function ReportBuilderPage() {
                         const isMeasure = measures.some((m) => (m.alias || m.field) === col);
                         return (
                           <td key={col} style={{ textAlign: isMeasure ? 'right' : 'left', fontVariantNumeric: isMeasure ? 'tabular-nums' : undefined }}>
-                            {isMeasure ? formatAxisValue(row[col]) : (row[col] ?? '-')}
+                            {isMeasure ? formatTableValue(row[col]) : (row[col] ?? '-')}
                           </td>
                         );
                       })}

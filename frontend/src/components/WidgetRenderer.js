@@ -7,7 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { CHART_COLORS, formatNumber, formatAxisValue, truncateLabel, getConditionalColor } from '../utils/helpers';
+import { CHART_COLORS, formatNumber, formatAxisValue, formatTableValue, truncateLabel, getConditionalColor } from '../utils/helpers';
 import { useTranslation } from '../i18n';
 
 const TOOLTIP_STYLE = {
@@ -271,7 +271,7 @@ function TableWidget({ widget, data }) {
                     color: condColor || undefined,
                     fontWeight: condColor ? 600 : undefined,
                   }}>
-                    {col.type === 'measure' ? formatAxisValue(val) : (val ?? '-')}
+                    {col.type === 'measure' ? formatTableValue(val) : (val ?? '-')}
                   </td>
                 );
               })}
@@ -461,7 +461,7 @@ function RegionMapWidget({ widget, data, onCrossFilter }) {
               {item.name}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
-              {formatAxisValue(item.value)}
+              {formatTableValue(item.value)}
             </div>
           </div>
         ))}
@@ -513,7 +513,7 @@ function PivotTableWidget({ widget, data }) {
                   const alias = m.alias || `measure_${mi}`;
                   const val = row[alias];
                   const cc = getConditionalColor(val, condRules);
-                  return <td key={mi} style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: cc || undefined, fontWeight: cc ? 600 : undefined }}>{formatAxisValue(val)}</td>;
+                  return <td key={mi} style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: cc || undefined, fontWeight: cc ? 600 : undefined }}>{formatTableValue(val)}</td>;
                 })}
               </tr>
             ))}
@@ -540,9 +540,9 @@ function PivotTableWidget({ widget, data }) {
               {colValues.map((cv) => {
                 const val = row[cv] || 0;
                 const cc = getConditionalColor(val, condRules);
-                return <td key={cv} style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: cc || undefined, fontWeight: cc ? 600 : undefined }}>{val ? formatAxisValue(val) : '-'}</td>;
+                return <td key={cv} style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: cc || undefined, fontWeight: cc ? 600 : undefined }}>{val ? formatTableValue(val) : '-'}</td>;
               })}
-              <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatAxisValue(row.__total || 0)}</td>
+              <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatTableValue(row.__total || 0)}</td>
             </tr>
           ))}
         </tbody>

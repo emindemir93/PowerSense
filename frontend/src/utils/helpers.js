@@ -67,6 +67,14 @@ export function formatAxisValue(value) {
   return num.toLocaleString();
 }
 
+export function formatTableValue(value) {
+  if (value === null || value === undefined) return '';
+  const num = parseFloat(value);
+  if (isNaN(num)) return String(value);
+  if (Number.isInteger(num)) return num.toLocaleString('tr-TR');
+  return num.toLocaleString('tr-TR', { maximumFractionDigits: 4 });
+}
+
 export function truncateLabel(label, maxLen = 20) {
   if (!label) return '';
   const str = String(label);
