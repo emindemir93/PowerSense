@@ -1,0 +1,76 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: powersense-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: powersense
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: powersense-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: powersense
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      JWT_SECRET: super_secret_jwt_key_change_in_production_32_chars_min
+      JWT_REFRESH_SECRET: super_secret_refresh_key_change_in_production_32_chars_min
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost:3000
+      BACKOFFICE_URL: http://localhost:3001
+      RATE_LIMIT_MAX: 2000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "npm run migrate && npm run seed && npm start"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: powersense-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      REACT_APP_API_URL: http://localhost:4000
+
+  backoffice:
+    build:
+      context: ../backoffice
+      dockerfile: Dockerfile
+    container_name: powersense-backoffice
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
