@@ -62,8 +62,8 @@ async function getPostgresSchema(targetDb) {
   const dbName = targetDb.client?.config?.connection?.database || 'database';
 
   const tablesResult = await targetDb.raw(`
-    SELECT table_name FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name
+    SELECT table_name, table_type FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_type IN ('BASE TABLE', 'VIEW') ORDER BY table_name
   `);
 
   const columnsResult = await targetDb.raw(`
@@ -133,6 +133,7 @@ async function getPostgresSchema(targetDb) {
 
   const tables = toRows(tablesResult).map((t) => ({
     name: t.table_name,
+    type: t.table_type === 'VIEW' ? 'view' : 'table',
     columns: columnsByTable[t.table_name] || [],
     rowCount: rowCounts[t.table_name] || 0,
   }));
@@ -143,9 +144,12 @@ async function getPostgresSchema(targetDb) {
     targetTable: fk.target_table, targetColumn: fk.target_column,
   }));
 
+  const tableCount = tables.filter((t) => t.type === 'table').length;
+  const viewCount = tables.filter((t) => t.type === 'view').length;
+
   return {
     database: dbName, dbType: 'postgresql', tables, relationships,
-    stats: { tableCount: tables.length, relationshipCount: relationships.length, totalColumns: toRows(columnsResult).length },
+    stats: { tableCount, viewCount, relationshipCount: relationships.length, totalColumns: toRows(columnsResult).length },
   };
 }
 
@@ -155,11 +159,15 @@ async function getMssqlSchema(targetDb) {
   const dbName = getRowVal(dbRows[0], 'db', 'DB') || 'database';
 
   const tablesRaw = await targetDb.raw(`
-    SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
-    WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
+    SELECT TABLE_NAME AS table_name, TABLE_TYPE AS table_type FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW') ORDER BY TABLE_NAME
   `);
   const tableRows = toRows(tablesRaw);
-  const tableNames = tableRows.map((r) => getRowVal(r, 'table_name', 'TABLE_NAME') || r.table_name || r.TABLE_NAME).filter(Boolean);
+  const tableEntries = tableRows.map((r) => ({
+    name: getRowVal(r, 'table_name', 'TABLE_NAME') || r.table_name || r.TABLE_NAME,
+    tableType: getRowVal(r, 'table_type', 'TABLE_TYPE') || r.table_type || r.TABLE_TYPE,
+  })).filter((e) => e.name);
+  const tableNames = tableEntries.map((e) => e.name);
 
   const colsRaw = await targetDb.raw(`
     SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type,
@@ -243,8 +251,14 @@ async function getMssqlSchema(targetDb) {
     });
   });
 
+  const typeMap = {};
+  tableEntries.forEach((e) => { typeMap[e.name] = e.tableType; });
+
   const tables = tableNames.map((t) => ({
-    name: t, columns: columnsByTable[t] || [], rowCount: rowCounts[t] || 0,
+    name: t,
+    type: typeMap[t] === 'VIEW' ? 'view' : 'table',
+    columns: columnsByTable[t] || [],
+    rowCount: rowCounts[t] || 0,
   }));
 
   const relationships = fks.map((fk) => ({
@@ -253,9 +267,12 @@ async function getMssqlSchema(targetDb) {
     targetTable: getRowVal(fk, 'target_table'), targetColumn: getRowVal(fk, 'target_column'),
   }));
 
+  const tableCount = tables.filter((t) => t.type === 'table').length;
+  const viewCount = tables.filter((t) => t.type === 'view').length;
+
   return {
     database: dbName, dbType: 'mssql', tables, relationships,
-    stats: { tableCount: tables.length, relationshipCount: relationships.length, totalColumns: cols.length },
+    stats: { tableCount, viewCount, relationshipCount: relationships.length, totalColumns: cols.length },
   };
 }
 
@@ -264,10 +281,14 @@ async function getMysqlSchema(targetDb) {
   const dbName = (dbResult[0] || dbResult.rows || [])[0]?.db || 'database';
 
   const tablesRaw = await targetDb.raw(`
-    SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
+    SELECT TABLE_NAME AS table_name, TABLE_TYPE AS table_type FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE IN ('BASE TABLE', 'VIEW') ORDER BY TABLE_NAME
   `);
-  const tableNames = (tablesRaw[0] || tablesRaw.rows || tablesRaw).map((r) => r.table_name || r.TABLE_NAME);
+  const tableEntries = (tablesRaw[0] || tablesRaw.rows || tablesRaw).map((r) => ({
+    name: r.table_name || r.TABLE_NAME,
+    tableType: r.table_type || r.TABLE_TYPE,
+  }));
+  const tableNames = tableEntries.map((e) => e.name);
 
   const colsRaw = await targetDb.raw(`
     SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, COLUMN_TYPE AS data_type,
@@ -314,8 +335,14 @@ async function getMysqlSchema(targetDb) {
     });
   });
 
+  const typeMap = {};
+  tableEntries.forEach((e) => { typeMap[e.name] = e.tableType; });
+
   const tables = tableNames.map((t) => ({
-    name: t, columns: columnsByTable[t] || [], rowCount: rowCounts[t] || 0,
+    name: t,
+    type: typeMap[t] === 'VIEW' ? 'view' : 'table',
+    columns: columnsByTable[t] || [],
+    rowCount: rowCounts[t] || 0,
   }));
 
   const relationships = fks.map((fk) => ({
@@ -324,9 +351,12 @@ async function getMysqlSchema(targetDb) {
     targetTable: fk.target_table, targetColumn: fk.target_column,
   }));
 
+  const tableCount = tables.filter((t) => t.type === 'table').length;
+  const viewCount = tables.filter((t) => t.type === 'view').length;
+
   return {
     database: dbName, dbType: 'mysql', tables, relationships,
-    stats: { tableCount: tables.length, relationshipCount: relationships.length, totalColumns: cols.length },
+    stats: { tableCount, viewCount, relationshipCount: relationships.length, totalColumns: cols.length },
   };
 }
 

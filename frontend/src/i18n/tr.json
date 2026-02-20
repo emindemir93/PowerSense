@@ -301,6 +301,12 @@
     "saveQueryHint": "Bu sorguyu Raporlar veya Veri Gezgini'nde kullanmak üzere kaydedin.",
     "queryNamePlaceholder": "Sorgu adı (örn. Aylık Satış Özeti)",
     "noSavedQueries": "Henüz kayıtlı sorgu yok. Bir sorgu yazın ve \"Sorgu Kaydet\"e tıklayarak Raporlarda kullanmak üzere kaydedin.",
+    "updateQueryTitle": "Sorgu Güncelle",
+    "overwrite": "Üzerine Yaz",
+    "saveAsNew": "Yeni Olarak Kaydet",
+    "updateQueryHint": "Mevcut sorguyu güncelleyin veya yeni bir sorgu olarak kaydedin.",
+    "editing": "Düzenleniyor:",
+    "searchTablesViews": "Tablo/görünüm/kolon ara...",
     "exampleQueries": {
       "usersProducts": "Ürün satın alan kullanıcılar",
       "revenueCategory": "Kategori ve bölgeye göre gelir",
@@ -371,6 +377,7 @@
     "foreignKey": "Yabancı Anahtar",
     "notNull": "BOŞ OLAMAZ",
     "tablesCount": "tablo",
+    "viewsCount": "görünüm",
     "relationshipsCount": "ilişki"
   },
 

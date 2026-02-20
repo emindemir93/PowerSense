@@ -301,6 +301,12 @@
     "saveQueryHint": "Save this query to use it when creating Reports or in Data Explorer.",
     "queryNamePlaceholder": "Query name (e.g. Monthly Sales Summary)",
     "noSavedQueries": "No saved queries yet. Write a query and click \"Save Query\" to save it for use in Reports.",
+    "updateQueryTitle": "Update Query",
+    "overwrite": "Overwrite",
+    "saveAsNew": "Save as New",
+    "updateQueryHint": "Update the existing query or save as a new one.",
+    "editing": "Editing:",
+    "searchTablesViews": "Search tables/views/columns...",
     "exampleQueries": {
       "usersProducts": "Users who bought products",
       "revenueCategory": "Revenue by category & region",
@@ -371,6 +377,7 @@
     "foreignKey": "Foreign Key",
     "notNull": "NOT NULL",
     "tablesCount": "tables",
+    "viewsCount": "views",
     "relationshipsCount": "relationships"
   },
 

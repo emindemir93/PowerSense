@@ -220,7 +220,9 @@ export default function SchemaViewerPage() {
             <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               {schema.database && <strong>{schema.database}</strong>}
               {schema.dbType && <span style={{ marginLeft: 4, background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 10, padding: '1px 5px', borderRadius: 3 }}>{schema.dbType.toUpperCase()}</span>}
-              {' '}&middot; {schema.stats.tableCount} {t('schema.tablesCount')} &middot; {schema.stats.relationshipCount} {t('schema.relationshipsCount')} &middot; {schema.stats.totalColumns} {t('schema.columns')}
+              {' '}&middot; {schema.stats.tableCount} {t('schema.tablesCount')}
+              {schema.stats.viewCount > 0 && <> &middot; {schema.stats.viewCount} {t('schema.viewsCount')}</>}
+              {' '}&middot; {schema.stats.relationshipCount} {t('schema.relationshipsCount')} &middot; {schema.stats.totalColumns} {t('schema.columns')}
             </span>
           )}
         </div>
@@ -408,11 +410,14 @@ export default function SchemaViewerPage() {
                     justifyContent: 'space-between',
                     height: HEADER_H,
                   }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: isSelected ? '#fff' : COLORS.col, letterSpacing: 0.3 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: isSelected ? '#fff' : COLORS.col, letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 6 }}>
                       {table.name}
+                      {table.type === 'view' && (
+                        <span style={{ fontSize: 8, fontWeight: 600, background: isSelected ? 'rgba(255,255,255,0.25)' : '#7c3aed30', color: isSelected ? '#fff' : '#a371f7', padding: '1px 5px', borderRadius: 3, letterSpacing: 0.5 }}>VIEW</span>
+                      )}
                     </span>
                     <span style={{ fontSize: 10, color: isSelected ? 'rgba(255,255,255,0.7)' : COLORS.type, fontVariantNumeric: 'tabular-nums' }}>
-                      {table.rowCount.toLocaleString()} {t('schema.rows')}
+                      {table.type !== 'view' ? `${table.rowCount.toLocaleString()} ${t('schema.rows')}` : t('schema.columns').replace(/^\w/, (c) => c.toUpperCase())}
                     </span>
                   </div>
 

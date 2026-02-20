@@ -97,6 +97,9 @@ export default function SQLEditorPage() {
   const [saveQueryName, setSaveQueryName] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState('');
+  const [loadedQueryId, setLoadedQueryId] = useState(null);
+  const [loadedQueryName, setLoadedQueryName] = useState('');
+  const [saveMode, setSaveMode] = useState(null);
   const textareaRef = useRef(null);
 
   const { data: connections } = useQuery({
@@ -120,10 +123,25 @@ export default function SQLEditorPage() {
 
   const saveQueryMutation = useMutation({
     mutationFn: (data) => savedQueriesApi.create(data),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['saved-queries'] });
       setShowSaveModal(false);
       setSaveQueryName('');
+      setSaveMode(null);
+      const created = res?.data?.data;
+      if (created) {
+        setLoadedQueryId(created.id);
+        setLoadedQueryName(created.name);
+      }
+    },
+  });
+
+  const updateQueryMutation = useMutation({
+    mutationFn: ({ id, data }) => savedQueriesApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saved-queries'] });
+      setShowSaveModal(false);
+      setSaveMode(null);
     },
   });
 
@@ -254,13 +272,22 @@ export default function SQLEditorPage() {
               </button>
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={() => setShowSaveModal(true)}
+                onClick={() => { setSaveMode(null); setSaveQueryName(''); setShowSaveModal(true); }}
                 disabled={!sql.trim()}
                 title="Save current query for use in Reports"
               >
                 {t('sqlEditor.saveQuery')}
               </button>
             </>
+          )}
+          {loadedQueryId && (
+            <span style={{ fontSize: 10, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12 }}>
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              {t('sqlEditor.editing')} {loadedQueryName}
+            </span>
           )}
           <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
           <button
@@ -291,7 +318,7 @@ export default function SQLEditorPage() {
           {EXAMPLE_QUERIES.map((eq, i) => (
             <button key={i} className="btn btn-ghost btn-sm"
               style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6 }}
-              onClick={() => { setSql(eq.sql); setShowExamples(false); setResult(null); setError(null); }}>
+              onClick={() => { setSql(eq.sql); setShowExamples(false); setLoadedQueryId(null); setLoadedQueryName(''); setResult(null); setError(null); }}>
               {t(eq.labelKey)}
             </button>
           ))}
@@ -307,7 +334,7 @@ export default function SQLEditorPage() {
             savedQueries.map((sq) => (
               <div
                 key={sq.id}
-                onClick={() => { setSql(sq.sql); setSelectedConnection(sq.connection_id || ''); setShowSavedQueries(false); setResult(null); setError(null); }}
+                onClick={() => { setSql(sq.sql); setSelectedConnection(sq.connection_id || ''); setLoadedQueryId(sq.id); setLoadedQueryName(sq.name); setShowSavedQueries(false); setResult(null); setError(null); }}
                 style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: 4, fontSize: 12, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}
               >
                 <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{sq.name}</div>
@@ -321,29 +348,59 @@ export default function SQLEditorPage() {
       {/* Save Query Modal */}
       {showSaveModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-          onClick={() => setShowSaveModal(false)}>
+          onClick={() => { setShowSaveModal(false); setSaveMode(null); }}>
           <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 20, minWidth: 360, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
             onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('sqlEditor.saveQueryTitle')}</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{t('sqlEditor.saveQueryHint')}</p>
-            <input
-              className="form-input"
-              placeholder={t('sqlEditor.queryNamePlaceholder')}
-              value={saveQueryName}
-              onChange={(e) => setSaveQueryName(e.target.value)}
-              style={{ width: '100%', marginBottom: 12 }}
-              autoFocus
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setShowSaveModal(false); setSaveQueryName(''); }}>{t('common.cancel')}</button>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => saveQueryMutation.mutate({ name: saveQueryName.trim(), sql: sql.trim(), connection_id: selectedConnection || undefined })}
-                disabled={!saveQueryName.trim() || saveQueryMutation.isPending}
-              >
-                {saveQueryMutation.isPending ? t('common.saving') : t('common.save')}
-              </button>
-            </div>
+
+            {/* Loaded query exists and no sub-mode chosen yet → show overwrite / save-as-new choice */}
+            {loadedQueryId && saveMode === null ? (
+              <>
+                <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('sqlEditor.updateQueryTitle')}</h3>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+                  {t('sqlEditor.updateQueryHint')} — <strong>{loadedQueryName}</strong>
+                </p>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setShowSaveModal(false); setSaveMode(null); }}>{t('common.cancel')}</button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => { setSaveMode('new'); setSaveQueryName(''); }}
+                  >
+                    {t('sqlEditor.saveAsNew')}
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => updateQueryMutation.mutate({ id: loadedQueryId, data: { name: loadedQueryName, sql: sql.trim(), connection_id: selectedConnection || undefined } })}
+                    disabled={updateQueryMutation.isPending}
+                  >
+                    {updateQueryMutation.isPending ? t('common.saving') : t('sqlEditor.overwrite')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('sqlEditor.saveQueryTitle')}</h3>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{t('sqlEditor.saveQueryHint')}</p>
+                <input
+                  className="form-input"
+                  placeholder={t('sqlEditor.queryNamePlaceholder')}
+                  value={saveQueryName}
+                  onChange={(e) => setSaveQueryName(e.target.value)}
+                  style={{ width: '100%', marginBottom: 12 }}
+                  autoFocus
+                />
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setShowSaveModal(false); setSaveQueryName(''); setSaveMode(null); }}>{t('common.cancel')}</button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => saveQueryMutation.mutate({ name: saveQueryName.trim(), sql: sql.trim(), connection_id: selectedConnection || undefined })}
+                    disabled={!saveQueryName.trim() || saveQueryMutation.isPending}
+                  >
+                    {saveQueryMutation.isPending ? t('common.saving') : t('common.save')}
+                  </button>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
       )}
@@ -352,7 +409,7 @@ export default function SQLEditorPage() {
       {showHistory && history.length > 0 && (
         <div style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', padding: 8, maxHeight: 200, overflow: 'auto' }}>
           {history.map((h, i) => (
-            <div key={i} onClick={() => { setSql(h.sql); setShowHistory(false); setResult(null); setError(null); }}
+            <div key={i} onClick={() => { setSql(h.sql); setShowHistory(false); setLoadedQueryId(null); setLoadedQueryName(''); setResult(null); setError(null); }}
               style={{ padding: '6px 12px', cursor: 'pointer', borderRadius: 4, fontSize: 12, fontFamily: 'monospace', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
@@ -400,15 +457,24 @@ export default function SQLEditorPage() {
                       style={{ width: 10, height: 10, transform: expandedTables[table.name] ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.15s', flexShrink: 0 }}>
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12, flexShrink: 0 }}>
-                      <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="3" x2="9" y2="21" />
-                    </svg>
+                    {table.type === 'view' ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#a371f7" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12, flexShrink: 0 }}>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12, flexShrink: 0 }}>
+                        <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="3" x2="9" y2="21" />
+                      </svg>
+                    )}
                     <span
                       onClick={(e) => { e.stopPropagation(); insertAtCursor(table.name); }}
                       title={t('sqlEditor.clickToInsert')}
-                      style={{ cursor: 'pointer' }}
+                      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                     >
                       {table.name}
+                      {table.type === 'view' && (
+                        <span style={{ fontSize: 7, fontWeight: 700, background: '#7c3aed30', color: '#a371f7', padding: '0 3px', borderRadius: 2, letterSpacing: 0.5 }}>VIEW</span>
+                      )}
                     </span>
                     <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 'auto' }}>{table.columns.length}</span>
                   </div>

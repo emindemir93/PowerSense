@@ -30,14 +30,14 @@ const DB_CONFIGS = {
       connectTimeout: 10000,
     }),
     versionQuery: 'SELECT version() AS version, current_database() AS db, current_user AS "user"',
-    tableCountQuery: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'",
+    tableCountQuery: "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = 'public' AND table_type IN ('BASE TABLE', 'VIEW')",
     schemaQuery: `
-      SELECT t.table_name,
+      SELECT t.table_name, t.table_type,
         array_agg(json_build_object('column', c.column_name, 'type', c.data_type, 'nullable', c.is_nullable, 'default', c.column_default) ORDER BY c.ordinal_position) AS columns
       FROM information_schema.tables t
       JOIN information_schema.columns c ON c.table_schema = t.table_schema AND c.table_name = t.table_name
-      WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
-      GROUP BY t.table_name ORDER BY t.table_name`,
+      WHERE t.table_schema = 'public' AND t.table_type IN ('BASE TABLE', 'VIEW')
+      GROUP BY t.table_name, t.table_type ORDER BY t.table_name`,
     fkQuery: `
       SELECT tc.table_name AS from_table, kcu.column_name AS from_column, ccu.table_name AS to_table, ccu.column_name AS to_column
       FROM information_schema.table_constraints tc
@@ -62,7 +62,7 @@ const DB_CONFIGS = {
       },
     }),
     versionQuery: "SELECT @@VERSION AS version, DB_NAME() AS db, SUSER_SNAME() AS [user]",
-    tableCountQuery: "SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'",
+    tableCountQuery: "SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW')",
     schemaQuery: null,
     fkQuery: null,
     wrapLimit: (sql, max) => injectMssqlTop(sql, max),
@@ -79,7 +79,7 @@ const DB_CONFIGS = {
       connectTimeout: 10000,
     }),
     versionQuery: "SELECT VERSION() AS version, DATABASE() AS db, CURRENT_USER() AS user",
-    tableCountQuery: "SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'",
+    tableCountQuery: "SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE IN ('BASE TABLE', 'VIEW')",
     schemaQuery: null,
     fkQuery: null,
     wrapLimit: (sql, max) => `SELECT * FROM (${sql}) AS __result LIMIT ${max}`,
@@ -185,6 +185,7 @@ async function getTablesForConnection(connectionId) {
     }
     return toRows(result).map((r) => ({
       name: r.table_name,
+      type: r.table_type === 'VIEW' ? 'view' : 'table',
       columns: r.columns,
       foreignKeys: fkMap[r.table_name] || [],
     }));
@@ -192,10 +193,14 @@ async function getTablesForConnection(connectionId) {
 
   if (dbType === 'mssql') {
     const tablesResult = await targetDb.raw(`
-      SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
-      WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
+      SELECT TABLE_NAME AS table_name, TABLE_TYPE AS table_type FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW') ORDER BY TABLE_NAME
     `);
-    const tables = toRows(tablesResult).map((r) => r.table_name || r.TABLE_NAME);
+    const tableEntries = toRows(tablesResult).map((r) => ({
+      name: r.table_name || r.TABLE_NAME,
+      tableType: r.table_type || r.TABLE_TYPE,
+    }));
+    const tables = tableEntries.map((e) => e.name);
 
     const colsResult = await targetDb.raw(`
       SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type,
@@ -231,8 +236,12 @@ async function getTablesForConnection(connectionId) {
       colMap[t].push({ column: c.column_name, type: c.data_type, nullable: c.is_nullable, default: c.column_default });
     }
 
+    const typeMap = {};
+    tableEntries.forEach((e) => { typeMap[e.name] = e.tableType; });
+
     return tables.map((t) => ({
       name: t,
+      type: typeMap[t] === 'VIEW' ? 'view' : 'table',
       columns: colMap[t] || [],
       foreignKeys: fkMap[t] || [],
     }));
@@ -240,10 +249,14 @@ async function getTablesForConnection(connectionId) {
 
   if (dbType === 'mysql') {
     const tablesResult = await targetDb.raw(`
-      SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME
+      SELECT TABLE_NAME AS table_name, TABLE_TYPE AS table_type FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE IN ('BASE TABLE', 'VIEW') ORDER BY TABLE_NAME
     `);
-    const tables = toRows(tablesResult).map((r) => r.table_name || r.TABLE_NAME);
+    const tableEntries = toRows(tablesResult).map((r) => ({
+      name: r.table_name || r.TABLE_NAME,
+      tableType: r.table_type || r.TABLE_TYPE,
+    }));
+    const tables = tableEntries.map((e) => e.name);
 
     const colsResult = await targetDb.raw(`
       SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type,
@@ -273,8 +286,12 @@ async function getTablesForConnection(connectionId) {
       fkMap[fk.from_table].push(fk);
     }
 
+    const typeMap = {};
+    tableEntries.forEach((e) => { typeMap[e.name] = e.tableType; });
+
     return tables.map((t) => ({
       name: t,
+      type: typeMap[t] === 'VIEW' ? 'view' : 'table',
       columns: colMap[t] || [],
       foreignKeys: fkMap[t] || [],
     }));
