@@ -134,6 +134,50 @@ export function getConditionalColor(value, rules) {
   return null;
 }
 
+export function aggregateSqlData(rows, dimensions = [], measures = []) {
+  if (!rows?.length || measures.length === 0) return rows || [];
+  if (dimensions.length === 0) {
+    const aggregated = {};
+    measures.forEach((m) => {
+      const vals = rows.map((r) => parseFloat(r[m.field]) || 0);
+      aggregated[m.alias || m.field] = applyAgg(m.aggregation, vals);
+    });
+    return [aggregated];
+  }
+
+  const groups = {};
+  rows.forEach((row) => {
+    const key = dimensions.map((d) => row[d] ?? '').join('|||');
+    if (!groups[key]) {
+      groups[key] = { _dimValues: dimensions.map((d) => row[d]), _rows: [] };
+    }
+    groups[key]._rows.push(row);
+  });
+
+  return Object.values(groups).map((g) => {
+    const result = {};
+    dimensions.forEach((d, i) => { result[d] = g._dimValues[i]; });
+    measures.forEach((m) => {
+      const vals = g._rows.map((r) => parseFloat(r[m.field]) || 0);
+      result[m.alias || m.field] = applyAgg(m.aggregation, vals);
+    });
+    return result;
+  });
+}
+
+function applyAgg(agg, vals) {
+  if (!vals.length) return 0;
+  switch (agg) {
+    case 'sum': return vals.reduce((a, b) => a + b, 0);
+    case 'avg': return vals.reduce((a, b) => a + b, 0) / vals.length;
+    case 'count': return vals.length;
+    case 'count_distinct': return new Set(vals).size;
+    case 'min': return Math.min(...vals);
+    case 'max': return Math.max(...vals);
+    default: return vals.reduce((a, b) => a + b, 0);
+  }
+}
+
 export function getDrillHierarchy(source, currentDimension) {
   const hierarchies = DRILL_HIERARCHIES[source];
   if (!hierarchies) return null;

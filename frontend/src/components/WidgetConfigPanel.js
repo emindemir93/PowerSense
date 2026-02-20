@@ -265,7 +265,7 @@ export default function WidgetConfigPanel({ widget, onClose }) {
                   ))}
                 </select>
                 {savedQueries.length === 0 && (
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>No saved queries. Use SQL Editor to save one.</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>No saved queries yet. Go to SQL Editor to write and save a query first.</p>
                 )}
               </div>
               {selectedSavedQuery && (
@@ -284,15 +284,39 @@ export default function WidgetConfigPanel({ widget, onClose }) {
 
             {sqlColumns.length > 0 && !isSlicer && (
               <>
+                {/* How it works guide */}
+                <div className="config-section" style={{ padding: '10px 12px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color, #30363d)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14, flexShrink: 0 }}>
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    How it works
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    <p style={{ margin: '0 0 4px' }}><strong>Dimensions</strong> = X axis labels (categories, dates, names). Data is grouped by these columns.</p>
+                    <p style={{ margin: '0 0 4px' }}><strong>Measures</strong> = Y axis values (amounts, counts). Aggregated per group using Sum, Avg, etc.</p>
+                    <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+                      {type === 'table' ? '💡 Table type shows raw data — no grouping applied.' :
+                       type === 'kpi' ? '💡 KPI shows a single aggregated value from the first measure.' :
+                       '💡 Pick 1 dimension + 1 measure for a simple chart. Add more for multi-series.'}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="config-section">
-                  <div className="config-section-title">Dimensions (Group By)</div>
+                  <div className="config-section-title">
+                    Dimensions (Group By)
+                  </div>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 6px' }}>
+                    Select columns to group/categorize your data
+                  </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {sqlColumns.filter((c) => !c.isNumeric).map((col) => (
                       <label key={col.key} className="form-checkbox">
                         <input type="checkbox" checked={sqlDimensions.includes(col.key)} onChange={() => toggleSqlDimension(col.key)} />
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           {col.label}
-                          <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>text</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-tertiary, #161b22)', padding: '1px 5px', borderRadius: 3 }}>ABC</span>
                         </span>
                       </label>
                     ))}
@@ -301,7 +325,7 @@ export default function WidgetConfigPanel({ widget, onClose }) {
                         <input type="checkbox" checked={sqlDimensions.includes(col.key)} onChange={() => toggleSqlDimension(col.key)} />
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           {col.label}
-                          <span style={{ fontSize: 9, color: 'var(--accent)', background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>num</span>
+                          <span style={{ fontSize: 9, color: 'var(--accent)', background: 'var(--bg-tertiary, #161b22)', padding: '1px 5px', borderRadius: 3 }}>123</span>
                         </span>
                       </label>
                     ))}
@@ -310,18 +334,21 @@ export default function WidgetConfigPanel({ widget, onClose }) {
 
                 <div className="config-section">
                   <div className="config-section-title">
-                    Measures
+                    Measures (Values)
                     <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '2px 8px' }}
-                      onClick={() => { const numCols = sqlColumns.filter((c) => c.isNumeric && !sqlMeasures.some((m) => m.field === c.key)); if (numCols.length > 0) addSqlMeasure(numCols[0].key); }}>
+                      onClick={() => { const avail = sqlColumns.filter((c) => !sqlMeasures.some((m) => m.field === c.key)); if (avail.length > 0) addSqlMeasure((avail.find((c) => c.isNumeric) || avail[0]).key); }}>
                       + Add
                     </button>
                   </div>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 6px' }}>
+                    Select numeric columns to aggregate and display as values
+                  </p>
                   {sqlMeasures.map((m, i) => (
                     <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-end', marginBottom: 8 }}>
                       <div style={{ flex: 1 }}>
                         <select className="form-select" value={m.field} onChange={(e) => updateSqlMeasure(i, { field: e.target.value, alias: e.target.value })}>
                           {sqlColumns.map((col) => (
-                            <option key={col.key} value={col.key}>{col.label}{col.isNumeric ? ' (num)' : ''}</option>
+                            <option key={col.key} value={col.key}>{col.label}{col.isNumeric ? ' ⓝ' : ''}</option>
                           ))}
                         </select>
                       </div>
@@ -336,16 +363,35 @@ export default function WidgetConfigPanel({ widget, onClose }) {
                     </div>
                   ))}
                   {sqlMeasures.length === 0 && (
-                    <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Add measures to visualize numeric columns</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>Click "+ Add" to pick a column for chart values</p>
                   )}
                 </div>
 
-                <div className="config-section">
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12, flexShrink: 0 }}>
-                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                    </svg>
-                    {sqlPreview?.rowCount || 0} rows returned &middot; {sqlColumns.length} columns detected
+                {/* Live preview summary */}
+                <div className="config-section" style={{ padding: '8px 12px', background: 'var(--bg-elevated)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 11, height: 11, flexShrink: 0 }}>
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                      </svg>
+                      <strong>{sqlPreview?.rowCount || 0}</strong> rows &middot; <strong>{sqlColumns.length}</strong> columns
+                    </div>
+                    {sqlDimensions.length > 0 && sqlMeasures.length > 0 && (
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        Will group by <strong>{sqlDimensions.join(', ')}</strong> and show{' '}
+                        {sqlMeasures.map((m) => `${m.aggregation?.toUpperCase() || 'SUM'}(${m.field})`).join(', ')}
+                      </div>
+                    )}
+                    {sqlDimensions.length === 0 && sqlMeasures.length > 0 && (
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        No dimension selected — will show a single total: {sqlMeasures.map((m) => `${m.aggregation?.toUpperCase() || 'SUM'}(${m.field})`).join(', ')}
+                      </div>
+                    )}
+                    {sqlDimensions.length === 0 && sqlMeasures.length === 0 && (
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        Select dimensions and measures above to configure the chart
+                      </div>
+                    )}
                   </div>
                 </div>
               </>

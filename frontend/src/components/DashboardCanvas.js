@@ -3,7 +3,7 @@ import { Responsive, WidthProvider } from 'react-grid-layout';
 import { useQuery } from '@tanstack/react-query';
 import { useDashboardStore } from '../store/dashboardStore';
 import { queryApi, sqlApi } from '../services/api';
-import { buildQueryPayload, isWidgetConfigured, getDrillHierarchy } from '../utils/helpers';
+import { buildQueryPayload, isWidgetConfigured, getDrillHierarchy, aggregateSqlData } from '../utils/helpers';
 import WidgetRenderer from './WidgetRenderer';
 import SlicerWidget from './SlicerWidget';
 
@@ -33,7 +33,7 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
 
   const isSqlWidget = effectiveConfig?.type === 'sql';
 
-  const { data, isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['widget-data', widget.id, queryPayload, drillState],
     queryFn: async () => {
       if (isSqlWidget) {
@@ -46,6 +46,15 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
     enabled: configured && !!queryPayload && widget.type !== 'slicer',
     staleTime: 30000,
   });
+
+  const data = useMemo(() => {
+    if (!isSqlWidget || !rawData?.length) return rawData;
+    const dims = effectiveConfig?.dimensions || [];
+    const meas = effectiveConfig?.measures || [];
+    if (meas.length === 0 && dims.length === 0) return rawData;
+    if (widget.type === 'table') return rawData;
+    return aggregateSqlData(rawData, dims, meas);
+  }, [rawData, isSqlWidget, effectiveConfig, widget.type]);
 
   const handleCrossFilter = useCallback(
     (field, value) => {
