@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dashboardsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
+import { useTranslation } from '../i18n';
 
 export default function DashboardsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
@@ -49,8 +51,8 @@ export default function DashboardsPage() {
   return (
     <div className="content-area">
       <div className="page-header">
-        <h1>Dashboards</h1>
-        <p>Create and manage your BI dashboards</p>
+        <h1>{t('dashboards.title')}</h1>
+        <p>{t('dashboards.subtitle')}</p>
       </div>
 
       <div className="dashboards-grid">
@@ -59,7 +61,7 @@ export default function DashboardsPage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            <span style={{ fontSize: 14, fontWeight: 500 }}>New Dashboard</span>
+            <span style={{ fontSize: 14, fontWeight: 500 }}>{t('dashboards.newDashboard')}</span>
           </div>
         )}
 
@@ -74,14 +76,14 @@ export default function DashboardsPage() {
             <div className="dashboard-card-header">
               <div>
                 <h3>{d.name}</h3>
-                <p>{d.description || 'No description'}</p>
+                <p>{d.description || t('dashboards.noDescription')}</p>
               </div>
               {canEdit && (
                 <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
                   <button
                     className="btn btn-ghost btn-icon btn-sm"
                     onClick={() => duplicateMutation.mutate(d.id)}
-                    title="Duplicate"
+                    title={t('common.duplicate')}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
@@ -89,8 +91,8 @@ export default function DashboardsPage() {
                   </button>
                   <button
                     className="btn btn-ghost btn-icon btn-sm"
-                    onClick={() => { if (window.confirm('Delete this dashboard?')) deleteMutation.mutate(d.id); }}
-                    title="Delete"
+                    onClick={() => { if (window.confirm(t('dashboards.deleteConfirm'))) deleteMutation.mutate(d.id); }}
+                    title={t('common.delete')}
                     style={{ color: 'var(--danger)' }}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -102,9 +104,9 @@ export default function DashboardsPage() {
               )}
             </div>
             <div className="dashboard-card-meta">
-              <span>{d.widget_count || 0} widgets</span>
-              {d.creator_name && <span>by {d.creator_name}</span>}
-              {d.is_public && <span className="badge badge-blue">Public</span>}
+              <span>{d.widget_count || 0} {t('dashboards.widgets')}</span>
+              {d.creator_name && <span>{t('dashboards.by')} {d.creator_name}</span>}
+              {d.is_public && <span className="badge badge-blue">{t('common.public')}</span>}
             </div>
           </div>
         ))}
@@ -122,17 +124,17 @@ export default function DashboardsPage() {
             <form onSubmit={handleCreate}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label className="form-label">Dashboard Name</label>
-                  <input className="form-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Sales Overview" autoFocus required />
+                  <label className="form-label">{t('dashboards.dashboardName')}</label>
+                  <input className="form-input" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('dashboards.namePlaceholder')} autoFocus required />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Description</label>
-                  <input className="form-input" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Brief description..." />
+                  <label className="form-label">{t('common.description')}</label>
+                  <input className="form-input" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder={t('dashboards.descPlaceholder')} />
                 </div>
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreate(false)}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary">{t('common.create')}</button>
               </div>
             </form>
           </div>

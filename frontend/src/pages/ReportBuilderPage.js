@@ -4,17 +4,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryApi, reportsApi, savedQueriesApi, sqlApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { formatAxisValue } from '../utils/helpers';
+import { useTranslation } from '../i18n';
 
 const AGG_OPTIONS = [
-  { value: 'sum', label: 'Sum' },
-  { value: 'count', label: 'Count' },
-  { value: 'count_distinct', label: 'Count Distinct' },
-  { value: 'avg', label: 'Average' },
-  { value: 'min', label: 'Min' },
-  { value: 'max', label: 'Max' },
+  { value: 'sum', labelKey: 'aggOptions.sum' },
+  { value: 'count', labelKey: 'aggOptions.count' },
+  { value: 'count_distinct', labelKey: 'aggOptions.countDistinct' },
+  { value: 'avg', labelKey: 'aggOptions.avg' },
+  { value: 'min', labelKey: 'aggOptions.min' },
+  { value: 'max', labelKey: 'aggOptions.max' },
 ];
 
 export default function ReportBuilderPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -213,7 +215,7 @@ export default function ReportBuilderPage() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Report name..."
+            placeholder={t('reportBuilder.namePlaceholder')}
             disabled={!canEdit}
           />
         </div>
@@ -223,14 +225,14 @@ export default function ReportBuilderPage() {
             onClick={handlePreview}
             disabled={!queryPayload || previewLoading}
           >
-            {previewLoading ? 'Running...' : 'Run Query'}
+            {previewLoading ? t('common.running') : t('reportBuilder.runQuery')}
           </button>
           {!isNew && (
             <button className="btn btn-secondary btn-sm" onClick={handleExport}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              Export CSV
+              {t('reportBuilder.exportCsv')}
             </button>
           )}
           {canEdit && (
@@ -239,7 +241,7 @@ export default function ReportBuilderPage() {
               onClick={handleSave}
               disabled={!name.trim() || !queryPayload || saveMutation.isPending}
             >
-              {saveMutation.isPending ? 'Saving...' : saved ? 'Saved!' : 'Save Report'}
+              {saveMutation.isPending ? t('common.saving') : saved ? t('common.saved') : t('reportBuilder.saveReport')}
             </button>
           )}
         </div>
@@ -250,23 +252,23 @@ export default function ReportBuilderPage() {
         {/* Left: Query Builder */}
         <div style={{ width: 340, borderRight: '1px solid var(--border)', overflow: 'auto', padding: 16, background: 'var(--bg-secondary)', flexShrink: 0 }}>
           <div className="config-section">
-            <div className="config-section-title">Report Details</div>
+            <div className="config-section-title">{t('reportBuilder.details')}</div>
             <div className="form-group">
-              <label className="form-label">Description</label>
-              <input className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What does this report show?" />
+              <label className="form-label">{t('reportBuilder.description')}</label>
+              <input className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('reportBuilder.descPlaceholder')} />
             </div>
             <label className="form-checkbox" style={{ marginBottom: 10 }}>
               <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-              Public (visible to all users)
+              {t('reportBuilder.publicLabel')}
             </label>
 
             <div className="form-group">
-              <label className="form-label">Schedule (Auto-run)</label>
+              <label className="form-label">{t('reportBuilder.schedule')}</label>
               <select className="form-select" value={schedule} onChange={(e) => setSchedule(e.target.value)}>
-                <option value="">No schedule</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+                <option value="">{t('reportBuilder.noSchedule')}</option>
+                <option value="daily">{t('reportBuilder.daily')}</option>
+                <option value="weekly">{t('reportBuilder.weekly')}</option>
+                <option value="monthly">{t('reportBuilder.monthly')}</option>
               </select>
               {schedule && <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>Report will auto-run {schedule} and results will be cached.</span>}
             </div>
@@ -275,29 +277,29 @@ export default function ReportBuilderPage() {
           <div className="divider" />
 
           <div className="config-section">
-            <div className="config-section-title">1. Query Type</div>
+            <div className="config-section-title">{t('reportBuilder.queryType')}</div>
             <div className="form-group">
               <select className="form-select" value={queryType} onChange={(e) => { setQueryType(e.target.value); setPreviewData(null); }}>
-                <option value="visual">Visual Builder</option>
-                <option value="sql">Saved Query</option>
+                <option value="visual">{t('widget.visualBuilder')}</option>
+                <option value="sql">{t('widget.savedQuery')}</option>
               </select>
             </div>
           </div>
 
           {queryType === 'sql' && (
             <div className="config-section">
-              <div className="config-section-title">2. Select Saved Query</div>
+              <div className="config-section-title">{t('reportBuilder.selectSavedQuery')}</div>
               <div className="form-group">
                 <select className="form-select" value={savedQueryId} onChange={(e) => { const v = e.target.value; setSavedQueryId(v); if (v !== '__custom__') { setSqlQuery(''); setSqlConnectionId(''); } setPreviewData(null); }}>
-                  <option value="">Select a saved query...</option>
-                  {sqlQuery && <option value="__custom__">Custom SQL (from report)</option>}
+                  <option value="">{t('reportBuilder.selectSavedQueryPlaceholder')}</option>
+                  {sqlQuery && <option value="__custom__">{t('reportBuilder.customSql')}</option>}
                   {savedQueries.map((sq) => (
                     <option key={sq.id} value={sq.id}>{sq.name}</option>
                   ))}
                 </select>
                 {savedQueries.length === 0 && (
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-                    No saved queries. Go to SQL Editor, write a query, and click "Save Query" first.
+                    {t('reportBuilder.noSavedQueries')}
                   </p>
                 )}
               </div>
@@ -306,10 +308,10 @@ export default function ReportBuilderPage() {
 
           {queryType === 'visual' && (
           <div className="config-section">
-            <div className="config-section-title">2. Data Source</div>
+            <div className="config-section-title">{t('reportBuilder.dataSource')}</div>
             <div className="form-group">
               <select className="form-select" value={source} onChange={(e) => handleSourceChange(e.target.value)}>
-                <option value="">Select data source...</option>
+                <option value="">{t('reportBuilder.selectSource')}</option>
                 {schema && Object.entries(schema).map(([key, val]) => (
                   <option key={key} value={key}>{val.label}</option>
                 ))}
@@ -321,7 +323,7 @@ export default function ReportBuilderPage() {
           {queryType === 'visual' && sourceSchema && (
             <>
               <div className="config-section">
-                <div className="config-section-title">3. Dimensions (Group By)</div>
+                <div className="config-section-title">{t('reportBuilder.dimensionsStep')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {sourceSchema.dimensions.map((dim) => (
                     <label key={dim.key} className="form-checkbox">
@@ -338,8 +340,8 @@ export default function ReportBuilderPage() {
 
               <div className="config-section">
                 <div className="config-section-title">
-                  4. Measures (Aggregations)
-                  <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '2px 8px' }} onClick={addMeasure}>+ Add</button>
+                  {t('reportBuilder.measuresStep')}
+                  <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '2px 8px' }} onClick={addMeasure}>{t('common.add')}</button>
                 </div>
                 {measures.map((m, i) => (
                   <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
@@ -350,7 +352,7 @@ export default function ReportBuilderPage() {
                     </select>
                     <select className="form-select" style={{ flex: 1 }} value={m.aggregation} onChange={(e) => updateMeasure(i, { aggregation: e.target.value })}>
                       {AGG_OPTIONS.map((a) => (
-                        <option key={a.value} value={a.value}>{a.label}</option>
+                        <option key={a.value} value={a.value}>{t(a.labelKey)}</option>
                       ))}
                     </select>
                     <button className="btn btn-ghost btn-icon btn-sm" onClick={() => removeMeasure(i)} style={{ color: 'var(--danger)', flexShrink: 0 }}>
@@ -362,15 +364,15 @@ export default function ReportBuilderPage() {
                 ))}
                 {measures.length === 0 && (
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 0' }}>
-                    Click "+ Add" to add a measure
+                    {t('reportBuilder.addMeasureHint')}
                   </div>
                 )}
               </div>
 
               <div className="config-section">
-                <div className="config-section-title">5. Options</div>
+                <div className="config-section-title">{t('reportBuilder.optionsStep')}</div>
                 <div className="form-group">
-                  <label className="form-label">Row Limit</label>
+                  <label className="form-label">{t('widget.rowLimit')}</label>
                   <input className="form-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} min={1} max={10000} />
                 </div>
               </div>
@@ -382,12 +384,12 @@ export default function ReportBuilderPage() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Query Results
-              {previewData && <span style={{ fontWeight: 400, marginLeft: 8 }}>({previewData.length} rows)</span>}
+              {t('reportBuilder.queryResults')}
+              {previewData && <span style={{ fontWeight: 400, marginLeft: 8 }}>({previewData.length} {t('common.rows')})</span>}
             </span>
             {queryPayload && (
               <button className="btn btn-primary btn-sm" onClick={handlePreview} disabled={previewLoading}>
-                {previewLoading ? 'Running...' : 'Run Query'}
+                {previewLoading ? t('common.running') : t('reportBuilder.runQuery')}
               </button>
             )}
           </div>
@@ -398,8 +400,8 @@ export default function ReportBuilderPage() {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 48, height: 48 }}>
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <h3>Build Your Query</h3>
-                <p>Select a data source, choose dimensions and measures, then click "Run Query" to preview results</p>
+                <h3>{t('reportBuilder.buildQuery')}</h3>
+                <p>{t('reportBuilder.buildQueryHint')}</p>
               </div>
             )}
 
@@ -411,8 +413,8 @@ export default function ReportBuilderPage() {
 
             {previewData && previewData.length === 0 && (
               <div className="empty-state" style={{ height: '100%' }}>
-                <h3>No Results</h3>
-                <p>Try adjusting your query parameters</p>
+                <h3>{t('common.noResults')}</h3>
+                <p>{t('reportBuilder.noResultsHint')}</p>
               </div>
             )}
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { connectionsApi } from '../services/api';
+import { useTranslation } from '../i18n';
 
 const EMPTY_FORM = { name: '', db_type: 'postgresql', host: '', port: 5432, database: '', username: '', password: '', ssl: false, is_default: false };
 
@@ -11,6 +12,7 @@ const DB_TYPES = [
 ];
 
 export default function ConnectionsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -113,9 +115,9 @@ export default function ConnectionsPage() {
             <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
           </svg>
           <div>
-            <h1 style={{ margin: 0 }}>Database Connections</h1>
+            <h1 style={{ margin: 0 }}>{t('connections.title')}</h1>
             <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
-              Manage data source connections for BI queries, SQL Editor, and dashboards.
+              {t('connections.subtitle')}
             </p>
           </div>
         </div>
@@ -127,7 +129,7 @@ export default function ConnectionsPage() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 16, height: 16 }}>
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          New Connection
+          {t('connections.newConnection')}
         </button>
       </div>
 
@@ -136,7 +138,7 @@ export default function ConnectionsPage() {
         <div className="modal-overlay" onClick={resetForm}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 560 }}>
             <div className="modal-header">
-              <h2>{editId ? 'Edit Connection' : 'New Connection'}</h2>
+              <h2>{editId ? t('connections.editConnection') : t('connections.newConnection')}</h2>
               <button className="btn btn-ghost btn-icon" onClick={resetForm}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -145,13 +147,13 @@ export default function ConnectionsPage() {
             </div>
             <div style={{ padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="form-group">
-                <label className="form-label">Connection Name *</label>
+                <label className="form-label">{t('connections.connectionName')}</label>
                 <input className="form-input" value={form.name} onChange={(e) => updateField('name', e.target.value)}
-                  placeholder="e.g. Production Database" />
+                  placeholder={t('connections.namePlaceholder')} />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Database Type</label>
+                <label className="form-label">{t('connections.dbType')}</label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {DB_TYPES.map((dbt) => (
                     <button key={dbt.value} type="button"
@@ -175,45 +177,45 @@ export default function ConnectionsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 12 }}>
                 <div className="form-group">
-                  <label className="form-label">{form.db_type === 'mssql' ? 'Server *' : 'Host *'}</label>
+                  <label className="form-label">{t('connections.host')}</label>
                   <input className="form-input" value={form.host} onChange={(e) => updateField('host', e.target.value)}
-                    placeholder={form.db_type === 'mssql' ? 'e.g. SQLSERVER\\INSTANCE' : 'e.g. localhost or db.example.com'} />
+                    placeholder={form.db_type === 'mssql' ? 'e.g. SQLSERVER\\INSTANCE' : t('connections.hostPlaceholder')} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Port</label>
+                  <label className="form-label">{t('connections.port')}</label>
                   <input className="form-input" type="number" value={form.port}
                     onChange={(e) => updateField('port', parseInt(e.target.value) || 5432)} />
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Database Name *</label>
+                <label className="form-label">{t('connections.dbName')}</label>
                 <input className="form-input" value={form.database} onChange={(e) => updateField('database', e.target.value)}
-                  placeholder="e.g. qlicksense" />
+                  placeholder={t('connections.dbNamePlaceholder')} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
-                  <label className="form-label">Username *</label>
+                  <label className="form-label">{t('connections.username')}</label>
                   <input className="form-input" value={form.username} onChange={(e) => updateField('username', e.target.value)}
-                    placeholder="e.g. postgres" />
+                    placeholder={t('connections.usernamePlaceholder')} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Password {editId ? '(leave empty to keep)' : '*'}</label>
+                  <label className="form-label">{t('connections.password')} {editId ? t('connections.passwordKeep') : '*'}</label>
                   <input className="form-input" type="password" value={form.password}
                     onChange={(e) => updateField('password', e.target.value)}
-                    placeholder={editId ? '••••••••' : 'Enter password'} />
+                    placeholder={editId ? '••••••••' : t('connections.passwordPlaceholder')} />
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                 <label className="form-checkbox">
                   <input type="checkbox" checked={form.ssl} onChange={(e) => updateField('ssl', e.target.checked)} />
-                  Use SSL
+                  {t('connections.useSSL')}
                 </label>
                 <label className="form-checkbox">
                   <input type="checkbox" checked={form.is_default} onChange={(e) => updateField('is_default', e.target.checked)} />
-                  Set as default connection
+                  {t('connections.setDefault')}
                 </label>
               </div>
 
@@ -227,7 +229,7 @@ export default function ConnectionsPage() {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
                       <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
-                    Connection Successful
+                    {t('connections.connectionSuccess')}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                     <div>Database: <strong>{testResult.database}</strong> · User: <strong>{testResult.user}</strong></div>
@@ -242,7 +244,7 @@ export default function ConnectionsPage() {
                   background: 'rgba(248, 81, 73, 0.1)', border: '1px solid rgba(248, 81, 73, 0.3)',
                   borderRadius: 8, padding: 12,
                 }}>
-                  <div style={{ fontWeight: 600, color: '#f85149', fontSize: 13, marginBottom: 4 }}>Connection Failed</div>
+                  <div style={{ fontWeight: 600, color: '#f85149', fontSize: 13, marginBottom: 4 }}>{t('connections.connectionFailed')}</div>
                   <div style={{ fontSize: 12, color: '#ffa198', fontFamily: 'monospace' }}>{testError}</div>
                 </div>
               )}
@@ -250,13 +252,13 @@ export default function ConnectionsPage() {
               {/* Actions */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
                 <button className="btn btn-secondary" onClick={handleTestNew} disabled={testing || !form.host || !form.database || !form.username || (!editId && !form.password)}>
-                  {testing ? 'Testing...' : 'Test Connection'}
+                  {testing ? t('common.testing') : t('connections.testConnection')}
                 </button>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-ghost" onClick={resetForm}>Cancel</button>
+                  <button className="btn btn-ghost" onClick={resetForm}>{t('common.cancel')}</button>
                   <button className="btn btn-primary" onClick={handleSave}
                     disabled={saveMutation.isPending || !form.name || !form.host || !form.database || !form.username || (!editId && !form.password)}>
-                    {saveMutation.isPending ? 'Saving...' : editId ? 'Update' : 'Create'}
+                    {saveMutation.isPending ? t('common.saving') : editId ? t('common.update') : t('common.create')}
                   </button>
                 </div>
               </div>
@@ -278,9 +280,9 @@ export default function ConnectionsPage() {
             <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
             <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
           </svg>
-          <h3>No Connections Yet</h3>
-          <p>Add a database connection to start using BI features with your data.</p>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>The app will use the built-in database until you configure an external connection.</p>
+          <h3>{t('connections.noConnections')}</h3>
+          <p>{t('connections.noConnectionsHint')}</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('connections.noConnectionsNote')}</p>
         </div>
       )}
 
@@ -305,17 +307,17 @@ export default function ConnectionsPage() {
                       {(conn.db_type || 'postgresql').toUpperCase()}
                     </span>
                     {conn.is_default && (
-                      <span style={{ background: 'var(--accent)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>DEFAULT</span>
+                      <span style={{ background: 'var(--accent)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{t('common.default')}</span>
                     )}
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor(conn.status), display: 'inline-block' }} />
-                      {conn.status}
+                      {conn.status === 'connected' ? t('connections.connected') : conn.status === 'failed' ? t('connections.failed') : conn.status}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                    <span title="Host"><strong>Host:</strong> {conn.host}:{conn.port}</span>
-                    <span title="Database"><strong>DB:</strong> {conn.database}</span>
-                    <span title="User"><strong>User:</strong> {conn.username}</span>
+                    <span title="Host"><strong>{t('connections.hostLabel')}</strong> {conn.host}:{conn.port}</span>
+                    <span title="Database"><strong>{t('connections.dbLabel')}</strong> {conn.database}</span>
+                    <span title="User"><strong>{t('connections.userLabel')}</strong> {conn.username}</span>
                     {conn.ssl && <span style={{ color: '#3fb950' }}>SSL</span>}
                   </div>
                   {conn.last_error && conn.status === 'failed' && (
@@ -325,21 +327,21 @@ export default function ConnectionsPage() {
                   )}
                   {conn.last_tested_at && (
                     <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>
-                      Last tested: {new Date(conn.last_tested_at).toLocaleString('tr-TR')}
+                      {t('connections.lastTested')} {new Date(conn.last_tested_at).toLocaleString('tr-TR')}
                     </div>
                   )}
                 </div>
 
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleTestExisting(conn.id)}>Test</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleTestExisting(conn.id)}>{t('common.test')}</button>
                   {!conn.is_default && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => setDefaultMutation.mutate(conn.id)}>Set Default</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setDefaultMutation.mutate(conn.id)}>{t('connections.setDefault')}</button>
                   )}
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(conn)}>Edit</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => handleEdit(conn)}>{t('common.edit')}</button>
                   {!conn.is_default && (
                     <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }}
-                      onClick={() => { if (window.confirm('Delete this connection?')) deleteMutation.mutate(conn.id); }}>
-                      Delete
+                      onClick={() => { if (window.confirm(t('connections.deleteConfirm'))) deleteMutation.mutate(conn.id); }}>
+                      {t('common.delete')}
                     </button>
                   )}
                 </div>
@@ -358,15 +360,15 @@ export default function ConnectionsPage() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
             <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
-          How it works
+          {t('connections.howItWorks')}
         </div>
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-          <li>The <strong>default connection</strong> is used by SQL Editor, Schema Viewer, and BI queries</li>
-          <li>If no connection is configured, the app uses the built-in database</li>
-          <li>Always <strong>test the connection</strong> before setting it as default</li>
-          <li>Only <strong>SELECT</strong> queries are allowed on external connections (read-only)</li>
-          <li>Supports <strong>PostgreSQL</strong>, <strong>SQL Server (MSSQL)</strong>, and <strong>MySQL/MariaDB</strong></li>
-          <li>MSSQL: use <code style={{ background: 'var(--bg-tertiary)', padding: '1px 4px', borderRadius: 3, fontSize: 11 }}>SERVER\INSTANCE</code> format for named instances</li>
+          <li>{t('connections.howDefault')}</li>
+          <li>{t('connections.howBuiltIn')}</li>
+          <li>{t('connections.howTest')}</li>
+          <li>{t('connections.howReadOnly')}</li>
+          <li>{t('connections.howSupported')}</li>
+          <li>{t('connections.howMssql')}</li>
         </ul>
       </div>
     </div>

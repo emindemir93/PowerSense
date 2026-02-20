@@ -6,10 +6,12 @@ import { queryApi, sqlApi } from '../services/api';
 import { buildQueryPayload, isWidgetConfigured, getDrillHierarchy, aggregateSqlData } from '../utils/helpers';
 import WidgetRenderer from './WidgetRenderer';
 import SlicerWidget from './SlicerWidget';
+import { useTranslation } from '../i18n';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected, onSelect, onDelete, drillState }) {
+  const { t } = useTranslation();
   const drillDown = useDashboardStore((s) => s.drillDown);
   const drillUp = useDashboardStore((s) => s.drillUp);
   const resetDrill = useDashboardStore((s) => s.resetDrill);
@@ -92,33 +94,33 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
       onClick={(e) => { if (editMode) { e.stopPropagation(); onSelect(widget.id); } }}
     >
       <div className="widget-header">
-        <span className="widget-title">{widget.title || 'Untitled'}</span>
+        <span className="widget-title">{widget.title || t('dashboards.untitled')}</span>
         <div className="widget-actions">
           {hasDrillHistory && (
-            <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); drillUp(widget.id); }} title="Drill Up">
+            <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); drillUp(widget.id); }} title={t('builder.drillUp')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
                 <polyline points="18 15 12 9 6 15" />
               </svg>
             </button>
           )}
           {hasDrillHistory && (
-            <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); resetDrill(widget.id); }} title="Reset Drill">
+            <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); resetDrill(widget.id); }} title={t('builder.resetDrill')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
                 <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
               </svg>
             </button>
           )}
           {canDrill && !editMode && (
-            <span style={{ fontSize: 9, color: 'var(--text-muted)', padding: '0 4px' }} title="Click chart to drill down">DRILL</span>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)', padding: '0 4px' }} title="Click chart to drill down">{t('builder.drill')}</span>
           )}
           {editMode && (
             <>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); onSelect(widget.id); }} title="Configure">
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); onSelect(widget.id); }} title={t('common.configure')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
                 </svg>
               </button>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); onDelete(widget.id); }} style={{ color: 'var(--danger)' }} title="Delete">
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); onDelete(widget.id); }} style={{ color: 'var(--danger)' }} title={t('common.delete')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -134,8 +136,8 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
             </svg>
-            <h3>Configure Widget</h3>
-            <p>Click to select data source and measures</p>
+            <h3>{t('builder.configureWidget')}</h3>
+            <p>{t('builder.configureWidgetHint')}</p>
           </div>
         ) : widget.type === 'slicer' ? (
           <SlicerWidget widget={widget} />
@@ -154,6 +156,7 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
 }
 
 export default function DashboardCanvas() {
+  const { t } = useTranslation();
   const widgets = useDashboardStore((s) => s.widgets);
   const editMode = useDashboardStore((s) => s.editMode);
   const selectedWidgetId = useDashboardStore((s) => s.selectedWidgetId);
@@ -184,8 +187,8 @@ export default function DashboardCanvas() {
   );
 
   const handleDelete = useCallback(
-    (id) => { if (window.confirm('Remove this widget?')) removeWidget(id); },
-    [removeWidget]
+    (id) => { if (window.confirm(t('builder.removeWidgetConfirm'))) removeWidget(id); },
+    [removeWidget, t]
   );
 
   if (widgets.length === 0) {
@@ -194,8 +197,8 @@ export default function DashboardCanvas() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 40, height: 40 }}>
           <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
         </svg>
-        <h3>No Widgets Yet</h3>
-        <p>{editMode ? 'Click "+ Add Widget" in the toolbar to get started' : 'This dashboard has no widgets'}</p>
+        <h3>{t('builder.noWidgets')}</h3>
+        <p>{editMode ? t('builder.noWidgetsEditHint') : t('builder.noWidgetsViewHint')}</p>
       </div>
     );
   }

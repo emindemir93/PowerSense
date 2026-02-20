@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { queryApi, savedQueriesApi, sqlApi } from '../services/api';
 import { formatAxisValue } from '../utils/helpers';
 import { useAuthStore } from '../store/authStore';
+import { useTranslation } from '../i18n';
 
 export default function DataExplorerPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const canUseSql = user?.role === 'admin' || user?.role === 'analyst';
 
@@ -95,34 +97,34 @@ export default function DataExplorerPage() {
   return (
     <div className="content-area">
       <div className="page-header">
-        <h1>Data Explorer</h1>
-        <p>Query and explore your data interactively</p>
+        <h1>{t('dataExplorer.title')}</h1>
+        <p>{t('dataExplorer.subtitle')}</p>
       </div>
 
       <div className="explorer-controls">
         {canUseSql && (
           <select className="form-select" style={{ width: 140 }} value={mode} onChange={(e) => { setMode(e.target.value); setHasQueried(false); setSqlResult(null); }}>
-            <option value="visual">Visual Builder</option>
-            <option value="sql">Saved Query</option>
+            <option value="visual">{t('widget.visualBuilder')}</option>
+            <option value="sql">{t('widget.savedQuery')}</option>
           </select>
         )}
 
         {mode === 'sql' ? (
           <>
             <select className="form-select" style={{ width: 220 }} value={savedQueryId} onChange={(e) => { setSavedQueryId(e.target.value); setHasQueried(false); setSqlResult(null); }}>
-              <option value="">Select saved query...</option>
+              <option value="">{t('dataExplorer.selectSavedQuery')}</option>
               {savedQueries.map((sq) => (
                 <option key={sq.id} value={sq.id}>{sq.name}</option>
               ))}
             </select>
             {savedQueries.length === 0 && (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No saved queries. Use SQL Editor to save one.</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('dataExplorer.noSavedQueries')}</span>
             )}
           </>
         ) : (
           <>
         <select className="form-select" style={{ width: 200 }} value={source} onChange={(e) => handleSourceChange(e.target.value)}>
-          <option value="">Select source...</option>
+          <option value="">{t('dataExplorer.selectSource')}</option>
           {schema && Object.entries(schema).map(([key, val]) => (
             <option key={key} value={key}>{val.label}</option>
           ))}
@@ -131,7 +133,7 @@ export default function DataExplorerPage() {
         {sourceSchema && (
           <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Dimensions:</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('dataExplorer.dimensionsLabel')}</span>
               {sourceSchema.dimensions.map((d) => (
                 <label key={d.key} className="form-checkbox" style={{ fontSize: 12 }}>
                   <input type="checkbox" checked={selectedDims.includes(d.key)} onChange={() => toggleDim(d.key)} />
@@ -140,7 +142,7 @@ export default function DataExplorerPage() {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Measures:</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('dataExplorer.measuresLabel')}</span>
               {sourceSchema.measures.map((m) => (
                 <label key={m.key} className="form-checkbox" style={{ fontSize: 12 }}>
                   <input type="checkbox" checked={selectedMeasures.includes(m.key)} onChange={() => toggleMeasure(m.key)} />
@@ -151,12 +153,12 @@ export default function DataExplorerPage() {
           </>
         )}
 
-        <input className="form-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} style={{ width: 80 }} min={1} max={10000} placeholder="Limit" />
+        <input className="form-input" type="number" value={limit} onChange={(e) => setLimit(e.target.value)} style={{ width: 80 }} min={1} max={10000} placeholder={t('dataExplorer.limit')} />
           </>
         )}
 
         <button className="btn btn-primary btn-sm" onClick={handleRun} disabled={!canRun || displayLoading}>
-          {displayLoading ? 'Running...' : 'Run Query'}
+          {displayLoading ? t('common.running') : t('reportBuilder.runQuery')}
         </button>
       </div>
 
@@ -169,7 +171,7 @@ export default function DataExplorerPage() {
       {hasQueried && displayResult && displayResult.length > 0 && (
         <>
           <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
-            {displayResult.length} rows returned
+            {displayResult.length} {t('dataExplorer.rowsReturned')}
           </div>
           <div className="explorer-table-wrap">
             <table className="widget-table">
@@ -203,8 +205,8 @@ export default function DataExplorerPage() {
 
       {hasQueried && displayResult && displayResult.length === 0 && (
         <div className="empty-state">
-          <h3>No Results</h3>
-          <p>Try adjusting your query parameters</p>
+          <h3>{t('common.noResults')}</h3>
+          <p>{t('reportBuilder.noResultsHint')}</p>
         </div>
       )}
     </div>

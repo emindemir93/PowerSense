@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../services/api';
+import { useTranslation } from '../i18n';
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [currentPwd, setCurrentPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
@@ -17,23 +19,23 @@ export default function ProfilePage() {
     setError('');
 
     if (newPwd !== confirmPwd) {
-      setError('Passwords do not match');
+      setError(t('profile.passwordMismatch'));
       return;
     }
     if (newPwd.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('profile.passwordTooShort'));
       return;
     }
 
     setLoading(true);
     try {
       await authApi.changePassword(currentPwd, newPwd);
-      setMessage('Password changed successfully');
+      setMessage(t('profile.passwordChanged'));
       setCurrentPwd('');
       setNewPwd('');
       setConfirmPwd('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to change password');
+      setError(err.response?.data?.message || t('profile.passwordFailed'));
     } finally {
       setLoading(false);
     }
@@ -48,8 +50,8 @@ export default function ProfilePage() {
   return (
     <div className="content-area">
       <div className="page-header">
-        <h1>Profile</h1>
-        <p>Manage your account settings</p>
+        <h1>{t('profile.title')}</h1>
+        <p>{t('profile.subtitle')}</p>
       </div>
 
       <div className="profile-section">
@@ -74,18 +76,18 @@ export default function ProfilePage() {
         </div>
 
         <div className="card">
-          <h3 style={{ fontSize: 16, marginBottom: 16 }}>Change Password</h3>
+          <h3 style={{ fontSize: 16, marginBottom: 16 }}>{t('profile.changePassword')}</h3>
           <form onSubmit={handleChangePassword}>
             <div className="form-group">
-              <label className="form-label">Current Password</label>
+              <label className="form-label">{t('profile.currentPassword')}</label>
               <input className="form-input" type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label className="form-label">New Password</label>
+              <label className="form-label">{t('profile.newPassword')}</label>
               <input className="form-input" type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label className="form-label">Confirm New Password</label>
+              <label className="form-label">{t('profile.confirmPassword')}</label>
               <input className="form-input" type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} required />
             </div>
 
@@ -93,7 +95,7 @@ export default function ProfilePage() {
             {message && <div style={{ color: 'var(--success)', fontSize: 13, marginBottom: 12 }}>{message}</div>}
 
             <button className="btn btn-primary" type="submit" disabled={loading}>
-              {loading ? 'Changing...' : 'Change Password'}
+              {loading ? t('profile.changingPassword') : t('profile.changePassword')}
             </button>
           </form>
         </div>

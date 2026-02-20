@@ -2,8 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryApi } from '../services/api';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useTranslation } from '../i18n';
 
 export default function SlicerWidget({ widget }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const crossFilters = useDashboardStore((s) => s.crossFilters);
   const toggleCrossFilter = useDashboardStore((s) => s.toggleCrossFilter);
@@ -49,7 +51,7 @@ export default function SlicerWidget({ widget }) {
 
   if (isLoading) return <div className="loading-spinner" />;
   if (!source || !field) {
-    return <div className="empty-state" style={{ padding: 12 }}><p style={{ fontSize: 12 }}>Configure slicer field</p></div>;
+    return <div className="empty-state" style={{ padding: 12 }}><p style={{ fontSize: 12 }}>{t('slicer.configure')}</p></div>;
   }
 
   return (
@@ -57,14 +59,14 @@ export default function SlicerWidget({ widget }) {
       <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           className="form-input"
-          placeholder="Search..."
+          placeholder={t('slicer.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ height: 26, fontSize: 11, flex: 1 }}
         />
         {activeValues.length > 0 && (
           <button className="btn btn-ghost btn-sm" onClick={clearAll} style={{ fontSize: 10, padding: '2px 6px', whiteSpace: 'nowrap' }}>
-            Clear
+            {t('slicer.clear')}
           </button>
         )}
       </div>

@@ -5,11 +5,13 @@ import { dashboardsApi, bookmarksApi, commentsApi, alertsApi } from '../services
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { WIDGET_TYPES } from '../utils/helpers';
+import { useTranslation } from '../i18n';
 import DashboardCanvas from '../components/DashboardCanvas';
 import WidgetConfigPanel from '../components/WidgetConfigPanel';
 import FilterBar from '../components/FilterBar';
 
 export default function BuilderPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -192,7 +194,7 @@ export default function BuilderPage() {
         </button>
         <div className="toolbar-title">
           {editMode ? (
-            <input value={dashboard?.name || ''} onChange={(e) => setDashboard({ ...dashboard, widgets, name: e.target.value })} placeholder="Dashboard name..." />
+            <input value={dashboard?.name || ''} onChange={(e) => setDashboard({ ...dashboard, widgets, name: e.target.value })} placeholder={t('builder.namePlaceholder')} />
           ) : (
             <span>{dashboard?.name || 'Untitled Dashboard'}</span>
           )}
@@ -203,13 +205,13 @@ export default function BuilderPage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
             </svg>
-            PDF
+            {t('builder.pdf')}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={handleExportExcel} disabled={exporting} title="Export Excel">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Excel
+            {t('builder.excel')}
           </button>
 
           {/* Bookmarks */}
@@ -218,16 +220,16 @@ export default function BuilderPage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
                 <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
               </svg>
-              Bookmarks
+              {t('builder.bookmarks')}
             </button>
             {showBookmarks && (
               <div style={{ position: 'absolute', top: '100%', right: 0, width: 280, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Bookmarks</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{t('builder.bookmarks')}</div>
                 {/* Save new */}
                 {canEdit && (
                   <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-                    <input className="form-input" placeholder="Bookmark name..." value={bookmarkName} onChange={(e) => setBookmarkName(e.target.value)} style={{ flex: 1, height: 28, fontSize: 11 }} />
-                    <button className="btn btn-primary btn-sm" onClick={handleSaveBookmark} disabled={!bookmarkName.trim()}>Save</button>
+                    <input className="form-input" placeholder={t('builder.bookmarkPlaceholder')} value={bookmarkName} onChange={(e) => setBookmarkName(e.target.value)} style={{ flex: 1, height: 28, fontSize: 11 }} />
+                    <button className="btn btn-primary btn-sm" onClick={handleSaveBookmark} disabled={!bookmarkName.trim()}>{t('common.save')}</button>
                   </div>
                 )}
                 {/* List */}
@@ -246,7 +248,7 @@ export default function BuilderPage() {
                     ))}
                   </div>
                 ) : (
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>No bookmarks saved yet</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('builder.noBookmarks')}</p>
                 )}
               </div>
             )}
@@ -274,16 +276,16 @@ export default function BuilderPage() {
             <>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowAddWidget(true)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                Add Widget
+                {t('builder.addWidget')}
               </button>
               <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving...' : saveMutation.isSuccess ? 'Saved!' : 'Save'}
+                {saveMutation.isPending ? t('common.saving') : saveMutation.isSuccess ? t('common.saved') : t('common.save')}
               </button>
             </>
           )}
           {canEdit && (
             <button className={`btn btn-sm ${editMode ? 'btn-secondary' : 'btn-primary'}`} onClick={() => { setEditMode(!editMode); deselectWidget(); }}>
-              {editMode ? 'View Mode' : 'Edit'}
+              {editMode ? t('builder.viewMode') : t('builder.editMode')}
             </button>
           )}
         </div>
@@ -302,7 +304,7 @@ export default function BuilderPage() {
         <div className="modal-overlay" onClick={() => setShowAddWidget(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 500 }}>
             <div className="modal-header">
-              <h2>Add Widget</h2>
+              <h2>{t('builder.addWidgetTitle')}</h2>
               <button className="btn btn-ghost btn-icon" onClick={() => setShowAddWidget(false)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
@@ -311,7 +313,7 @@ export default function BuilderPage() {
               {WIDGET_TYPES.map((wt) => (
                 <div key={wt.type} className="palette-item" onClick={() => handleAddWidget(wt)}>
                   <WidgetTypeIcon type={wt.type} />
-                  <span>{wt.label}</span>
+                  <span>{t('chartTypes.' + wt.type)}</span>
                 </div>
               ))}
             </div>
@@ -322,13 +324,13 @@ export default function BuilderPage() {
       {showComments && (
         <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 340, background: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', zIndex: 100, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 20px rgba(0,0,0,0.3)' }}>
           <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: 14 }}>Comments</h3>
+            <h3 style={{ margin: 0, fontSize: 14 }}>{t('builder.comments')}</h3>
             <button className="btn btn-ghost btn-icon" onClick={() => setShowComments(false)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
-            {comments?.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 40 }}>No comments yet</p>}
+            {comments?.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 40 }}>{t('builder.noComments')}</p>}
             {comments?.map((c) => (
               <div key={c.id} style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -343,10 +345,10 @@ export default function BuilderPage() {
             ))}
           </div>
           <div style={{ padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
-            <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment..."
+            <input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder={t('builder.commentPlaceholder')}
               onKeyDown={(e) => { if (e.key === 'Enter' && commentText.trim()) addCommentMutation.mutate({ dashboard_id: id, text: commentText }); }}
               style={{ flex: 1, background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', color: 'var(--text-primary)', fontSize: 12 }} />
-            <button className="btn btn-primary btn-sm" disabled={!commentText.trim()} onClick={() => addCommentMutation.mutate({ dashboard_id: id, text: commentText })}>Send</button>
+            <button className="btn btn-primary btn-sm" disabled={!commentText.trim()} onClick={() => addCommentMutation.mutate({ dashboard_id: id, text: commentText })}>{t('builder.send')}</button>
           </div>
         </div>
       )}
@@ -354,7 +356,7 @@ export default function BuilderPage() {
       {showAlerts && (
         <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 380, background: 'var(--bg-secondary)', borderLeft: '1px solid var(--border)', zIndex: 100, display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 20px rgba(0,0,0,0.3)' }}>
           <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, fontSize: 14 }}>Alerts & Thresholds</h3>
+            <h3 style={{ margin: 0, fontSize: 14 }}>{t('builder.alerts')}</h3>
             <button className="btn btn-ghost btn-icon" onClick={() => setShowAlerts(false)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
@@ -369,6 +371,7 @@ export default function BuilderPage() {
 }
 
 function AlertManager({ dashboardId, alerts, onDelete, onRefresh }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [measure, setMeasure] = useState('');
   const [operator, setOperator] = useState('>');
@@ -387,18 +390,18 @@ function AlertManager({ dashboardId, alerts, onDelete, onRefresh }) {
   return (
     <div>
       <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>New Alert</div>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alert name" style={{ width: '100%', marginBottom: 6, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
-        <input value={measure} onChange={(e) => setMeasure(e.target.value)} placeholder="Measure name (e.g. total_revenue)" style={{ width: '100%', marginBottom: 6, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{t('builder.newAlert')}</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('builder.alertName')} style={{ width: '100%', marginBottom: 6, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
+        <input value={measure} onChange={(e) => setMeasure(e.target.value)} placeholder={t('builder.measureName')} style={{ width: '100%', marginBottom: 6, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <select value={operator} onChange={(e) => setOperator(e.target.value)} style={{ flex: 1, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }}>
             <option value=">">{'>'}</option><option value=">=">{'>='}</option><option value="<">{'<'}</option><option value="<=">{'<='}</option><option value="=">{'='}</option>
           </select>
-          <input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder="Threshold" style={{ flex: 2, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
+          <input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder={t('builder.threshold')} style={{ flex: 2, background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 8px', color: 'var(--text-primary)', fontSize: 12 }} />
         </div>
-        <button className="btn btn-primary btn-sm" onClick={handleCreate} style={{ width: '100%' }}>Create Alert</button>
+        <button className="btn btn-primary btn-sm" onClick={handleCreate} style={{ width: '100%' }}>{t('builder.createAlert')}</button>
       </div>
-      {alerts.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 20 }}>No alerts defined</p>}
+      {alerts.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 20 }}>{t('builder.noAlerts')}</p>}
       {alerts.map((a) => (
         <div key={a.id} style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 10, marginBottom: 6, borderLeft: `3px solid ${a.triggered ? 'var(--danger)' : a.is_active ? 'var(--accent)' : 'var(--text-muted)'}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -407,7 +410,7 @@ function AlertManager({ dashboardId, alerts, onDelete, onRefresh }) {
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
             {a.measure} {a.operator} {a.threshold}
-            {a.triggered && <span style={{ color: 'var(--danger)', fontWeight: 600, marginLeft: 8 }}>TRIGGERED</span>}
+            {a.triggered && <span style={{ color: 'var(--danger)', fontWeight: 600, marginLeft: 8 }}>{t('builder.triggered')}</span>}
           </div>
         </div>
       ))}

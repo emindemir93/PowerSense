@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { CHART_COLORS, formatNumber, formatAxisValue, truncateLabel, getConditionalColor } from '../utils/helpers';
+import { useTranslation } from '../i18n';
 
 const TOOLTIP_STYLE = {
   contentStyle: { background: '#21262d', border: '1px solid #30363d', borderRadius: 6, fontSize: 12, color: '#e6edf3', padding: '8px 12px' },
@@ -27,9 +28,10 @@ function getMeasureLabels(widget) { return (widget.data_config?.measures || []).
 function getColors(widget) { return widget.visual_config?.colors || CHART_COLORS; }
 
 export default function WidgetRenderer({ widget, data, loading, onCrossFilter, activeCrossFilter }) {
+  const { t } = useTranslation();
   if (loading) return <div className="loading-spinner" />;
   if (!data || data.length === 0) {
-    return <div className="empty-state" style={{ padding: 16 }}><p style={{ fontSize: 12 }}>No data available</p></div>;
+    return <div className="empty-state" style={{ padding: 16 }}><p style={{ fontSize: 12 }}>{t('widget.noData')}</p></div>;
   }
 
   switch (widget.type) {
@@ -199,6 +201,7 @@ function PieChartWidget({ widget, data, onCrossFilter, innerRadius = 0 }) {
 }
 
 function ScatterChartWidget({ widget, data }) {
+  const { t } = useTranslation();
   const dims = widget.data_config?.dimensions || [];
   const measures = widget.data_config?.measures || [];
   const colors = getColors(widget);
@@ -210,7 +213,7 @@ function ScatterChartWidget({ widget, data }) {
     return data.map((d) => ({ x: parseFloat(d[xKey]) || 0, y: parseFloat(d[yKey]) || 0, name: dimKey ? d[dimKey] : '' }));
   }, [data, xKey, yKey, dimKey]);
 
-  if (measures.length < 2) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>Scatter requires 2+ measures</div>;
+  if (measures.length < 2) return <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>{t('widget.scatterRequires')}</div>;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -468,6 +471,7 @@ function RegionMapWidget({ widget, data, onCrossFilter }) {
 }
 
 function PivotTableWidget({ widget, data }) {
+  const { t } = useTranslation();
   const condRules = widget.visual_config?.conditionalRules || [];
 
   const { rowDim, colDim, pivotData, colValues, measures: pivotMeasures } = useMemo(() => {
@@ -494,7 +498,7 @@ function PivotTableWidget({ widget, data }) {
     return { rowDim, colDim, pivotData: Object.values(rowMap), colValues, measures };
   }, [data, widget.data_config]);
 
-  if (!rowDim) return <div className="empty-state"><p style={{ fontSize: 12 }}>Pivot needs at least 1 dimension</p></div>;
+  if (!rowDim) return <div className="empty-state"><p style={{ fontSize: 12 }}>{t('widget.pivotRequires')}</p></div>;
 
   if (!colDim) {
     return (
@@ -526,7 +530,7 @@ function PivotTableWidget({ widget, data }) {
           <tr>
             <th style={{ position: 'sticky', left: 0, background: 'var(--bg-tertiary)', zIndex: 2 }}>{rowDim}</th>
             {colValues.map((cv) => <th key={cv}>{truncateLabel(cv, 14)}</th>)}
-            <th style={{ fontWeight: 700 }}>Total</th>
+            <th style={{ fontWeight: 700 }}>{t('common.total')}</th>
           </tr>
         </thead>
         <tbody>

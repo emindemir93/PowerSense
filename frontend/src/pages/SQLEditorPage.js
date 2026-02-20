@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sqlApi, connectionsApi, savedQueriesApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { formatAxisValue } from '../utils/helpers';
+import { useTranslation } from '../i18n';
 
 const EXAMPLE_QUERIES = [
   {
-    label: 'Users who bought products',
+    labelKey: 'sqlEditor.exampleQueries.usersProducts',
     sql: `SELECT u.name AS customer, p.name AS product, o.quantity, o.total_price
 FROM orders o
 JOIN users u ON u.id = o.user_id
@@ -15,7 +16,7 @@ ORDER BY o.created_at DESC
 LIMIT 50`,
   },
   {
-    label: 'Revenue by category & region',
+    labelKey: 'sqlEditor.exampleQueries.revenueByCategory',
     sql: `SELECT c.name AS category, u.city AS region,
   COUNT(DISTINCT o.id) AS order_count,
   SUM(o.total_price) AS total_revenue,
@@ -28,7 +29,7 @@ GROUP BY c.name, u.city
 ORDER BY total_revenue DESC`,
   },
   {
-    label: 'Top customers by spend',
+    labelKey: 'sqlEditor.exampleQueries.topCustomers',
     sql: `SELECT u.name, u.email, u.city,
   COUNT(o.id) AS total_orders,
   SUM(o.total_price) AS total_spent,
@@ -41,7 +42,7 @@ ORDER BY total_spent DESC
 LIMIT 20`,
   },
   {
-    label: 'Product performance',
+    labelKey: 'sqlEditor.exampleQueries.productPerformance',
     sql: `SELECT p.name AS product, c.name AS category,
   p.price AS unit_price,
   COALESCE(SUM(o.quantity), 0) AS units_sold,
@@ -54,7 +55,7 @@ GROUP BY p.id, p.name, c.name, p.price
 ORDER BY revenue DESC`,
   },
   {
-    label: 'Monthly sales trend',
+    labelKey: 'sqlEditor.exampleQueries.monthlySales',
     sql: `SELECT
   TO_CHAR(o.created_at, 'YYYY-MM') AS month,
   COUNT(*) AS orders,
@@ -77,6 +78,7 @@ const SQL_KEYWORDS = [
 ];
 
 export default function SQLEditorPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const isAdmin = user?.role === 'admin';
@@ -213,7 +215,7 @@ export default function SQLEditorPage() {
           <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" style={{ width: 18, height: 18 }}>
             <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
           </svg>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>SQL Editor</span>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>{t('sqlEditor.title')}</span>
         </div>
 
         <div className="toolbar-actions" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -229,10 +231,10 @@ export default function SQLEditorPage() {
               }}
               title="Select database connection"
             >
-              <option value="">Default Connection</option>
+              <option value="">{t('sqlEditor.defaultConnection')}</option>
               {connections.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} {c.is_default ? '(default)' : ''}
+                  {c.name} {c.is_default ? `(${t('common.default')})` : ''}
                 </option>
               ))}
             </select>
@@ -240,15 +242,15 @@ export default function SQLEditorPage() {
           <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
           <button className="btn btn-ghost btn-sm" onClick={() => setShowExamples(!showExamples)}
             style={{ position: 'relative' }}>
-            Examples
+            {t('sqlEditor.examples')}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={() => setShowHistory(!showHistory)}>
-            History ({history.length})
+            {t('sqlEditor.history')} ({history.length})
           </button>
           {canSave && (
             <>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowSavedQueries(!showSavedQueries)}>
-                Saved ({savedQueries.length})
+                {t('sqlEditor.saved')} ({savedQueries.length})
               </button>
               <button
                 className="btn btn-secondary btn-sm"
@@ -256,7 +258,7 @@ export default function SQLEditorPage() {
                 disabled={!sql.trim()}
                 title="Save current query for use in Reports"
               >
-                Save Query
+                {t('sqlEditor.saveQuery')}
               </button>
             </>
           )}
@@ -269,14 +271,14 @@ export default function SQLEditorPage() {
           >
             {running ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div className="loading-spinner" style={{ width: 12, height: 12 }} /> Running...
+                <div className="loading-spinner" style={{ width: 12, height: 12 }} /> {t('common.running')}
               </span>
             ) : (
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 12, height: 12 }}>
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
-                Run (Ctrl+Enter)
+                {t('sqlEditor.runButton')}
               </span>
             )}
           </button>
@@ -290,7 +292,7 @@ export default function SQLEditorPage() {
             <button key={i} className="btn btn-ghost btn-sm"
               style={{ fontSize: 11, border: '1px solid var(--border)', borderRadius: 6 }}
               onClick={() => { setSql(eq.sql); setShowExamples(false); setResult(null); setError(null); }}>
-              {eq.label}
+              {t(eq.labelKey)}
             </button>
           ))}
         </div>
@@ -300,7 +302,7 @@ export default function SQLEditorPage() {
       {showSavedQueries && canSave && (
         <div style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', padding: 8, maxHeight: 200, overflow: 'auto' }}>
           {savedQueries.length === 0 ? (
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>No saved queries yet. Write a query and click "Save Query" to save it for use in Reports.</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', padding: 8 }}>{t('sqlEditor.noSavedQueries')}</p>
           ) : (
             savedQueries.map((sq) => (
               <div
@@ -322,24 +324,24 @@ export default function SQLEditorPage() {
           onClick={() => setShowSaveModal(false)}>
           <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: 20, minWidth: 360, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
             onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>Save Query</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Save this query to use it when creating Reports or in Data Explorer.</p>
+            <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('sqlEditor.saveQueryTitle')}</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{t('sqlEditor.saveQueryHint')}</p>
             <input
               className="form-input"
-              placeholder="Query name (e.g. Monthly Sales Summary)"
+              placeholder={t('sqlEditor.queryNamePlaceholder')}
               value={saveQueryName}
               onChange={(e) => setSaveQueryName(e.target.value)}
               style={{ width: '100%', marginBottom: 12 }}
               autoFocus
             />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setShowSaveModal(false); setSaveQueryName(''); }}>Cancel</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowSaveModal(false); setSaveQueryName(''); }}>{t('common.cancel')}</button>
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => saveQueryMutation.mutate({ name: saveQueryName.trim(), sql: sql.trim(), connection_id: selectedConnection || undefined })}
                 disabled={!saveQueryName.trim() || saveQueryMutation.isPending}
               >
-                {saveQueryMutation.isPending ? 'Saving...' : 'Save'}
+                {saveQueryMutation.isPending ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </div>
@@ -355,7 +357,7 @@ export default function SQLEditorPage() {
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-secondary)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
               <span style={{ color: 'var(--text-muted)', marginRight: 8, fontSize: 10 }}>
-                {new Date(h.time).toLocaleTimeString('tr-TR')} · {h.rows} rows · {h.elapsed}ms
+                {new Date(h.time).toLocaleTimeString('tr-TR')} · {h.rows} {t('common.rows')} · {h.elapsed}{t('common.ms')}
               </span>
               {h.sql.substring(0, 120)}
             </div>
@@ -369,7 +371,7 @@ export default function SQLEditorPage() {
         {schemaOpen && (
           <div style={{ width: 260, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
             <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>Schema Browser</span>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{t('sqlEditor.schemaBrowser')}</span>
               <button className="btn btn-ghost btn-icon" onClick={() => setSchemaOpen(false)}
                 style={{ width: 20, height: 20, padding: 0 }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12 }}>
@@ -381,7 +383,7 @@ export default function SQLEditorPage() {
               <input
                 value={schemaSearch}
                 onChange={(e) => setSchemaSearch(e.target.value)}
-                placeholder="Search tables/columns..."
+                placeholder={t('sqlEditor.searchTables')}
                 style={{ width: '100%', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 4, padding: '5px 8px', color: 'var(--text-primary)', fontSize: 11 }}
               />
             </div>
@@ -403,7 +405,7 @@ export default function SQLEditorPage() {
                     </svg>
                     <span
                       onClick={(e) => { e.stopPropagation(); insertAtCursor(table.name); }}
-                      title="Click to insert table name"
+                      title={t('sqlEditor.clickToInsert')}
                       style={{ cursor: 'pointer' }}
                     >
                       {table.name}
@@ -454,7 +456,7 @@ export default function SQLEditorPage() {
 
             {/* SQL Keywords */}
             <div style={{ borderTop: '1px solid var(--border)', padding: 8, maxHeight: 100, overflow: 'auto' }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Quick Insert</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>{t('sqlEditor.quickInsert')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {SQL_KEYWORDS.slice(0, 20).map((kw) => (
                   <button key={kw} onClick={() => insertAtCursor(kw + ' ')}
@@ -497,7 +499,7 @@ export default function SQLEditorPage() {
                 ref={textareaRef}
                 value={sql}
                 onChange={(e) => setSql(e.target.value)}
-                placeholder="Write your SQL query here...&#10;&#10;Example:&#10;SELECT u.name, p.name AS product, o.quantity&#10;FROM orders o&#10;JOIN users u ON u.id = o.user_id&#10;JOIN products p ON p.id = o.product_id"
+                placeholder={t('sqlEditor.placeholder')}
                 spellCheck={false}
                 style={{
                   flex: 1, background: 'var(--bg-primary)', color: 'var(--text-primary)',
@@ -520,11 +522,11 @@ export default function SQLEditorPage() {
             {/* Results Header */}
             <div style={{ padding: '6px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', flexShrink: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                Results
+                {t('sqlEditor.results')}
                 {result && (
                   <span style={{ fontWeight: 400, fontSize: 11 }}>
-                    {result.rowCount} rows · {result.elapsed}ms
-                    {result.truncated && <span style={{ color: 'var(--warning)', marginLeft: 4 }}>(truncated at 5000)</span>}
+                    {result.rowCount} {t('common.rows')} · {result.elapsed}{t('common.ms')}
+                    {result.truncated && <span style={{ color: 'var(--warning)', marginLeft: 4 }}>{t('sqlEditor.truncated')}</span>}
                   </span>
                 )}
               </span>
@@ -533,7 +535,7 @@ export default function SQLEditorPage() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12 }}>
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  Export CSV
+                  {t('sqlEditor.exportCsv')}
                 </button>
               )}
             </div>
@@ -545,14 +547,14 @@ export default function SQLEditorPage() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ width: 40, height: 40, opacity: 0.5 }}>
                     <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
                   </svg>
-                  <h3 style={{ fontSize: 14, marginTop: 8 }}>Write a SQL query and press Ctrl+Enter to run</h3>
-                  <p style={{ fontSize: 12 }}>Click on table/column names in the schema browser to insert them. Try the Examples button for sample queries.</p>
+                  <h3 style={{ fontSize: 14, marginTop: 8 }}>{t('sqlEditor.emptyTitle')}</h3>
+                  <p style={{ fontSize: 12 }}>{t('sqlEditor.emptyHint')}</p>
                 </div>
               )}
 
               {running && (
                 <div style={{ padding: 40, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-                  <div className="loading-spinner" /> Running query...
+                  <div className="loading-spinner" /> {t('sqlEditor.runningQuery')}
                 </div>
               )}
 
@@ -566,7 +568,7 @@ export default function SQLEditorPage() {
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
                         <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
                       </svg>
-                      Query Error
+                      {t('sqlEditor.queryError')}
                     </div>
                     <pre style={{ margin: 0, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap', lineHeight: 1.5, color: '#ffa198' }}>
                       {error}
@@ -577,7 +579,7 @@ export default function SQLEditorPage() {
 
               {result?.rows?.length === 0 && (
                 <div className="empty-state" style={{ height: '100%' }}>
-                  <h3 style={{ fontSize: 14 }}>Query returned no results</h3>
+                  <h3 style={{ fontSize: 14 }}>{t('sqlEditor.noResults')}</h3>
                 </div>
               )}
 

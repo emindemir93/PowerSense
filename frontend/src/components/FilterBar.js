@@ -1,7 +1,9 @@
 import React from 'react';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useTranslation } from '../i18n';
 
 export default function FilterBar() {
+  const { t } = useTranslation();
   const crossFilters = useDashboardStore((s) => s.crossFilters);
   const removeCrossFilter = useDashboardStore((s) => s.removeCrossFilter);
   const clearCrossFilters = useDashboardStore((s) => s.clearCrossFilters);
@@ -61,7 +63,7 @@ export default function FilterBar() {
               </span>
             </div>
           ))}
-          <button className="btn btn-ghost btn-sm" onClick={clearCrossFilters} style={{ fontSize: 10, padding: '2px 8px' }}>Clear All</button>
+          <button className="btn btn-ghost btn-sm" onClick={clearCrossFilters} style={{ fontSize: 10, padding: '2px 8px' }}>{t('common.clearAll')}</button>
         </>
       )}
     </div>

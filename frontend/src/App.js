@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './store/authStore';
+import { LanguageProvider } from './i18n';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardsPage from './pages/DashboardsPage';
@@ -33,6 +34,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
+    <LanguageProvider>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
@@ -54,5 +56,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
+    </LanguageProvider>
   );
 }

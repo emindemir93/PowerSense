@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { schemaApi, connectionsApi } from '../services/api';
+import { useTranslation } from '../i18n';
 
 const TABLE_WIDTH = 260;
 const HEADER_H = 36;
@@ -66,6 +67,7 @@ function getColumnY(table, columnName, positions) {
 }
 
 export default function SchemaViewerPage() {
+  const { t } = useTranslation();
   const canvasRef = useRef(null);
   const [positions, setPositions] = useState({});
   const [dragging, setDragging] = useState(null);
@@ -194,8 +196,8 @@ export default function SchemaViewerPage() {
     return (
       <div className="content-area">
         <div className="empty-state" style={{ padding: 60 }}>
-          <h3>{is403 ? 'Access Denied' : 'Error'}</h3>
-          <p>{is403 ? 'Only admin users can view the database schema.' : msg}</p>
+          <h3>{is403 ? t('schema.accessDenied') : t('common.error')}</h3>
+          <p>{is403 ? t('schema.accessDeniedHint') : msg}</p>
           {error?.response?.status === 401 && (
             <p style={{ fontSize: 12, marginTop: 8 }}>Token süresi dolmuş olabilir. Çıkış yapıp tekrar giriş yapın.</p>
           )}
@@ -213,12 +215,12 @@ export default function SchemaViewerPage() {
             <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
             <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
           </svg>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>Database Schema</span>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>{t('schema.title')}</span>
           {schema && (
             <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               {schema.database && <strong>{schema.database}</strong>}
               {schema.dbType && <span style={{ marginLeft: 4, background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 10, padding: '1px 5px', borderRadius: 3 }}>{schema.dbType.toUpperCase()}</span>}
-              {' '}&middot; {schema.stats.tableCount} tables &middot; {schema.stats.relationshipCount} relationships &middot; {schema.stats.totalColumns} columns
+              {' '}&middot; {schema.stats.tableCount} {t('schema.tablesCount')} &middot; {schema.stats.relationshipCount} {t('schema.relationshipsCount')} &middot; {schema.stats.totalColumns} {t('schema.columns')}
             </span>
           )}
         </div>
@@ -233,7 +235,7 @@ export default function SchemaViewerPage() {
                 fontSize: 11, height: 30,
               }}
             >
-              <option value="">Default Connection</option>
+              <option value="">{t('schema.defaultConnection')}</option>
               {connections.map((c) => (
                 <option key={c.id} value={c.id}>{c.name} ({(c.db_type || 'pg').toUpperCase()})</option>
               ))}
@@ -241,12 +243,12 @@ export default function SchemaViewerPage() {
           )}
           <input
             className="form-input"
-            placeholder="Search tables or columns..."
+            placeholder={t('schema.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: 220, height: 30, fontSize: 12 }}
           />
-          <button className="btn btn-secondary btn-sm" onClick={resetView}>Reset View</button>
+          <button className="btn btn-secondary btn-sm" onClick={resetView}>{t('schema.resetView')}</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button className="btn btn-ghost btn-sm" onClick={() => setZoom((z) => Math.min(2, z + 0.15))}>+</button>
             <span style={{ fontSize: 11, color: 'var(--text-secondary)', minWidth: 35, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
@@ -410,7 +412,7 @@ export default function SchemaViewerPage() {
                       {table.name}
                     </span>
                     <span style={{ fontSize: 10, color: isSelected ? 'rgba(255,255,255,0.7)' : COLORS.type, fontVariantNumeric: 'tabular-nums' }}>
-                      {table.rowCount.toLocaleString()} rows
+                      {table.rowCount.toLocaleString()} {t('schema.rows')}
                     </span>
                   </div>
 
@@ -483,12 +485,12 @@ export default function SchemaViewerPage() {
             </div>
 
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              {tableMap[selectedTable].columns.length} columns &middot; ~{tableMap[selectedTable].rowCount.toLocaleString()} rows
+              {tableMap[selectedTable].columns.length} {t('schema.columns')} &middot; ~{tableMap[selectedTable].rowCount.toLocaleString()} {t('schema.rows')}
             </div>
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: 0.5 }}>
-                Columns
+                {t('schema.columnsTitle')}
               </div>
               {tableMap[selectedTable].columns.map((col) => (
                 <div key={col.name} style={{
@@ -504,7 +506,7 @@ export default function SchemaViewerPage() {
                     <span style={{ fontSize: 13, fontWeight: col.isPrimaryKey ? 600 : 400 }}>{col.name}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, paddingLeft: col.isPrimaryKey || col.isForeignKey ? 30 : 0 }}>
-                    {col.type}{!col.nullable && ' · NOT NULL'}{col.hasDefault && ' · DEFAULT'}
+                    {col.type}{!col.nullable && ` · ${t('schema.notNull')}`}{col.hasDefault && ' · DEFAULT'}
                   </div>
                 </div>
               ))}
@@ -513,7 +515,7 @@ export default function SchemaViewerPage() {
             {schema.relationships.filter((r) => r.sourceTable === selectedTable || r.targetTable === selectedTable).length > 0 && (
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: 0.5 }}>
-                  Relationships
+                  {t('schema.relationships')}
                 </div>
                 {schema.relationships
                   .filter((r) => r.sourceTable === selectedTable || r.targetTable === selectedTable)
@@ -551,15 +553,15 @@ export default function SchemaViewerPage() {
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: COLORS.pk }} />
-                  <span style={{ color: 'var(--text-secondary)' }}>Primary Key</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('schema.primaryKey')}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: COLORS.fk }} />
-                  <span style={{ color: 'var(--text-secondary)' }}>Foreign Key</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('schema.foreignKey')}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                   <span style={{ color: COLORS.pk, fontWeight: 700, fontSize: 10 }}>*</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>NOT NULL</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('schema.notNull')}</span>
                 </div>
               </div>
             </div>
