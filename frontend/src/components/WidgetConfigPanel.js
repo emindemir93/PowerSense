@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { queryApi, savedQueriesApi } from '../services/api';
+import { queryApi, sqlApi, savedQueriesApi } from '../services/api';
 import { useDashboardStore } from '../store/dashboardStore';
 import { WIDGET_TYPES } from '../utils/helpers';
 
@@ -36,8 +36,8 @@ export default function WidgetConfigPanel({ widget, onClose }) {
   const [type, setType] = useState(widget?.type || 'bar');
   const [dataSourceType, setDataSourceType] = useState(widget?.data_config?.type === 'sql' ? 'sql' : 'visual');
   const [savedQueryId, setSavedQueryId] = useState(widget?.data_config?.saved_query_id || '');
-  const [sqlDimColumn, setSqlDimColumn] = useState(widget?.data_config?.sqlDimColumn || '');
-  const [sqlMeasureColumn, setSqlMeasureColumn] = useState(widget?.data_config?.sqlMeasureColumn || '');
+  const [sqlDimensions, setSqlDimensions] = useState(widget?.data_config?.type === 'sql' ? (widget?.data_config?.dimensions || []) : []);
+  const [sqlMeasures, setSqlMeasures] = useState(widget?.data_config?.type === 'sql' ? (widget?.data_config?.measures || []) : []);
   const [source, setSource] = useState(widget?.data_config?.source || '');
   const [dimensions, setDimensions] = useState(widget?.data_config?.dimensions || []);
   const [measures, setMeasures] = useState(widget?.data_config?.measures || []);
@@ -58,14 +58,39 @@ export default function WidgetConfigPanel({ widget, onClose }) {
     queryFn: () => savedQueriesApi.list().then((r) => r.data.data),
   });
 
+  const selectedSavedQuery = savedQueries.find((sq) => sq.id === savedQueryId);
+
+  const { data: sqlPreview, isLoading: sqlPreviewLoading } = useQuery({
+    queryKey: ['sql-preview', savedQueryId],
+    queryFn: async () => {
+      const sq = savedQueries.find((q) => q.id === savedQueryId);
+      if (!sq) return null;
+      const res = await sqlApi.execute(sq.sql, sq.connection_id);
+      return res.data.data;
+    },
+    enabled: dataSourceType === 'sql' && !!savedQueryId && savedQueries.length > 0,
+    staleTime: 60000,
+    retry: 1,
+  });
+
+  const sqlColumns = useMemo(() => {
+    if (!sqlPreview?.rows?.length) return [];
+    const sampleRows = sqlPreview.rows.slice(0, 50);
+    return Object.keys(sampleRows[0]).map((key) => {
+      const numCount = sampleRows.filter((r) => r[key] !== null && r[key] !== '' && !isNaN(Number(r[key]))).length;
+      const isNumeric = numCount > sampleRows.length * 0.6;
+      return { key, label: key, isNumeric };
+    });
+  }, [sqlPreview]);
+
   useEffect(() => {
     if (widget) {
       setTitle(widget.title || '');
       setType(widget.type || 'bar');
       setDataSourceType(widget.data_config?.type === 'sql' ? 'sql' : 'visual');
       setSavedQueryId(widget.data_config?.saved_query_id || '');
-      setSqlDimColumn(widget.data_config?.sqlDimColumn || '');
-      setSqlMeasureColumn(widget.data_config?.sqlMeasureColumn || '');
+      setSqlDimensions(widget.data_config?.type === 'sql' ? (widget.data_config?.dimensions || []) : []);
+      setSqlMeasures(widget.data_config?.type === 'sql' ? (widget.data_config?.measures || []) : []);
       setSource(widget.data_config?.source || '');
       setDimensions(widget.data_config?.dimensions || []);
       setMeasures(widget.data_config?.measures || []);
@@ -88,8 +113,6 @@ export default function WidgetConfigPanel({ widget, onClose }) {
   const isPivot = type === 'pivot';
   const showCondFormatting = isKpi || isTable || isPivot;
 
-  const selectedSavedQuery = savedQueries.find((sq) => sq.id === savedQueryId);
-
   const applyChanges = () => {
     let dataConfig;
     if (dataSourceType === 'sql' && selectedSavedQuery) {
@@ -98,10 +121,8 @@ export default function WidgetConfigPanel({ widget, onClose }) {
         sql: selectedSavedQuery.sql,
         connection_id: selectedSavedQuery.connection_id,
         saved_query_id: savedQueryId,
-        sqlDimColumn,
-        sqlMeasureColumn,
-        dimensions: sqlDimColumn ? [sqlDimColumn] : [],
-        measures: sqlMeasureColumn ? [{ field: sqlMeasureColumn, alias: sqlMeasureColumn, aggregation: 'sum' }] : [],
+        dimensions: sqlDimensions,
+        measures: sqlMeasures,
         limit: parseInt(limit) || 100,
       };
     } else {
@@ -127,6 +148,28 @@ export default function WidgetConfigPanel({ widget, onClose }) {
         ...(isGauge && { gaugeTarget: parseFloat(gaugeTarget) || 100 }),
       },
     });
+  };
+
+  const toggleSqlDimension = (col) => {
+    setSqlDimensions((prev) => prev.includes(col) ? prev.filter((d) => d !== col) : [...prev, col]);
+  };
+
+  const addSqlMeasure = (colKey) => {
+    setSqlMeasures((prev) => [...prev, { field: colKey, alias: colKey, aggregation: 'sum' }]);
+  };
+
+  const updateSqlMeasure = (index, updates) => {
+    setSqlMeasures((prev) => prev.map((m, i) => (i === index ? { ...m, ...updates } : m)));
+  };
+
+  const removeSqlMeasure = (index) => {
+    setSqlMeasures((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSavedQueryChange = (newId) => {
+    setSavedQueryId(newId);
+    setSqlDimensions([]);
+    setSqlMeasures([]);
   };
 
   const handleSourceChange = (newSource) => {
@@ -211,39 +254,103 @@ export default function WidgetConfigPanel({ widget, onClose }) {
 
         {/* Saved Query Config */}
         {dataSourceType === 'sql' && (
-          <div className="config-section">
-            <div className="config-section-title">Saved Query</div>
-            <div className="form-group">
-              <select className="form-select" value={savedQueryId} onChange={(e) => setSavedQueryId(e.target.value)}>
-                <option value="">Select a saved query...</option>
-                {savedQueries.map((sq) => (
-                  <option key={sq.id} value={sq.id}>{sq.name}</option>
-                ))}
-              </select>
-              {savedQueries.length === 0 && (
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>No saved queries. Use SQL Editor to save one.</p>
+          <>
+            <div className="config-section">
+              <div className="config-section-title">Saved Query</div>
+              <div className="form-group">
+                <select className="form-select" value={savedQueryId} onChange={(e) => handleSavedQueryChange(e.target.value)}>
+                  <option value="">Select a saved query...</option>
+                  {savedQueries.map((sq) => (
+                    <option key={sq.id} value={sq.id}>{sq.name}</option>
+                  ))}
+                </select>
+                {savedQueries.length === 0 && (
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>No saved queries. Use SQL Editor to save one.</p>
+                )}
+              </div>
+              {selectedSavedQuery && (
+                <div style={{ padding: 8, background: 'var(--bg-elevated)', borderRadius: 6, fontSize: 11, fontFamily: 'monospace', color: 'var(--text-muted)', maxHeight: 60, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  {selectedSavedQuery.sql?.substring(0, 200)}{selectedSavedQuery.sql?.length > 200 ? '...' : ''}
+                </div>
               )}
             </div>
-            {selectedSavedQuery && (
+
+            {sqlPreviewLoading && savedQueryId && (
+              <div className="config-section" style={{ textAlign: 'center', padding: 16 }}>
+                <div className="loading-spinner" style={{ width: 20, height: 20, margin: '0 auto 8px' }} />
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Discovering columns...</span>
+              </div>
+            )}
+
+            {sqlColumns.length > 0 && !isSlicer && (
               <>
-                <div className="form-group">
-                  <label className="form-label">Dimension Column (X axis / labels)</label>
-                  <input className="form-input" value={sqlDimColumn} onChange={(e) => setSqlDimColumn(e.target.value)}
-                    placeholder="e.g. category, month, name..." style={{ fontSize: 12 }} />
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Column name from query result for grouping</span>
+                <div className="config-section">
+                  <div className="config-section-title">Dimensions (Group By)</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {sqlColumns.filter((c) => !c.isNumeric).map((col) => (
+                      <label key={col.key} className="form-checkbox">
+                        <input type="checkbox" checked={sqlDimensions.includes(col.key)} onChange={() => toggleSqlDimension(col.key)} />
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {col.label}
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>text</span>
+                        </span>
+                      </label>
+                    ))}
+                    {sqlColumns.filter((c) => c.isNumeric).map((col) => (
+                      <label key={col.key} className="form-checkbox">
+                        <input type="checkbox" checked={sqlDimensions.includes(col.key)} onChange={() => toggleSqlDimension(col.key)} />
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {col.label}
+                          <span style={{ fontSize: 9, color: 'var(--accent)', background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>num</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Measure Column (Y axis / values)</label>
-                  <input className="form-input" value={sqlMeasureColumn} onChange={(e) => setSqlMeasureColumn(e.target.value)}
-                    placeholder="e.g. total, count, revenue..." style={{ fontSize: 12 }} />
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Column name from query result for values</span>
+
+                <div className="config-section">
+                  <div className="config-section-title">
+                    Measures
+                    <button className="btn btn-ghost btn-sm" style={{ marginLeft: 8, padding: '2px 8px' }}
+                      onClick={() => { const numCols = sqlColumns.filter((c) => c.isNumeric && !sqlMeasures.some((m) => m.field === c.key)); if (numCols.length > 0) addSqlMeasure(numCols[0].key); }}>
+                      + Add
+                    </button>
+                  </div>
+                  {sqlMeasures.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-end', marginBottom: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <select className="form-select" value={m.field} onChange={(e) => updateSqlMeasure(i, { field: e.target.value, alias: e.target.value })}>
+                          {sqlColumns.map((col) => (
+                            <option key={col.key} value={col.key}>{col.label}{col.isNumeric ? ' (num)' : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <select className="form-select" value={m.aggregation || 'sum'} onChange={(e) => updateSqlMeasure(i, { aggregation: e.target.value })}>
+                          {AGG_OPTIONS.map((a) => (<option key={a.value} value={a.value}>{a.label}</option>))}
+                        </select>
+                      </div>
+                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => removeSqlMeasure(i)} style={{ color: 'var(--danger)', flexShrink: 0 }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                  {sqlMeasures.length === 0 && (
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Add measures to visualize numeric columns</p>
+                  )}
                 </div>
-                <div style={{ marginTop: 4, padding: 8, background: 'var(--bg-elevated)', borderRadius: 6, fontSize: 11, fontFamily: 'monospace', color: 'var(--text-muted)', maxHeight: 60, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                  {selectedSavedQuery.sql?.substring(0, 150)}{selectedSavedQuery.sql?.length > 150 ? '...' : ''}
+
+                <div className="config-section">
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12, flexShrink: 0 }}>
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    {sqlPreview?.rowCount || 0} rows returned &middot; {sqlColumns.length} columns detected
+                  </div>
                 </div>
               </>
             )}
-          </div>
+          </>
         )}
 
         {/* Visual Builder Source */}
