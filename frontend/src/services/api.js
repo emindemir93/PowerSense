@@ -87,6 +87,9 @@ export const dashboardsApi = {
   addWidget: (dashId, data) => api.post(`/dashboards/${dashId}/widgets`, data),
   updateWidget: (dashId, widgetId, data) => api.put(`/dashboards/${dashId}/widgets/${widgetId}`, data),
   deleteWidget: (dashId, widgetId) => api.delete(`/dashboards/${dashId}/widgets/${widgetId}`),
+  share: (id) => api.post(`/dashboards/${id}/share`),
+  unshare: (id) => api.delete(`/dashboards/${id}/share`),
+  getShared: (token) => api.get(`/dashboards/shared/${token}`),
 };
 
 export const queryApi = {
@@ -166,4 +169,12 @@ export const customersApi = {
 export const productsApi = {
   list: (params) => api.get('/products', { params }),
   categories: () => api.get('/products/categories'),
+};
+
+export const usersApi = {
+  list: (params) => api.get('/users', { params }),
+  get: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
 };

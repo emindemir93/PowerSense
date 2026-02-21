@@ -57,7 +57,8 @@
     "userGuide": "Kullanım Kılavuzu",
     "profile": "Profil",
     "logout": "Çıkış Yap",
-    "settings": "Ayarlar"
+    "settings": "Ayarlar",
+    "users": "Kullanıcılar"
   },
 
   "login": {
@@ -120,7 +121,37 @@
     "removeWidgetConfirm": "Bu widget kaldırılsın mı?",
     "drillUp": "Yukarı Çık",
     "resetDrill": "Sıfırla",
-    "drill": "DETAY"
+    "drill": "DETAY",
+    "refresh": "Yenile",
+    "refreshOff": "Otomatik Kapalı",
+    "justNow": "az önce",
+    "ago": "önce",
+    "filters": "Filtreler",
+    "filterPanel": "Filtre Paneli",
+    "addFilter": "Filtre Ekle",
+    "filterSource": "Kaynak",
+    "filterField": "Alan",
+    "filterOperator": "Operatör",
+    "filterValue": "Değer",
+    "equals": "Eşittir",
+    "notEquals": "Eşit Değil",
+    "contains": "İçerir",
+    "greaterThan": "Büyüktür",
+    "lessThan": "Küçüktür",
+    "noFilters": "Aktif filtre yok",
+    "activeFilters": "Aktif Filtreler",
+    "theme": "Tema",
+    "selectTheme": "Tema Seç",
+    "share": "Paylaş",
+    "shareTitle": "Dashboard Paylaş",
+    "publicLink": "Herkese Açık Link",
+    "embedCode": "Embed Kodu",
+    "qrCode": "QR Kod",
+    "copy": "Kopyala",
+    "scanToView": "Görüntülemek için tarayın",
+    "disableSharing": "Paylaşımı Kapat",
+    "shareDisabled": "Paylaşım kapalı",
+    "enableSharing": "Paylaşımı Aç"
   },
 
   "widget": {
@@ -175,7 +206,15 @@
     "selectDimMeasure": "Grafiği yapılandırmak için yukarıdan boyut ve ölçü seçin",
     "noData": "Veri bulunamadı",
     "scatterRequires": "Dağılım grafiği 2+ ölçü gerektirir",
-    "pivotRequires": "Pivot tablo en az 1 boyut gerektirir"
+    "pivotRequires": "Pivot tablo en az 1 boyut gerektirir",
+    "appearance": "Görünüm",
+    "subtitle": "Alt Başlık",
+    "subtitlePlaceholder": "Kısa açıklama...",
+    "descriptionPlaceholder": "Widget hakkında bilgi...",
+    "titleAlignment": "Başlık Hizalama",
+    "alignLeft": "Sol",
+    "alignCenter": "Orta",
+    "alignRight": "Sağ"
   },
 
   "chartTypes": {
@@ -401,9 +440,42 @@
     "languageHint": "Arayüz dilini seçin"
   },
 
+  "themes": {
+    "default": "Varsayılan",
+    "ocean": "Okyanus",
+    "sunset": "Gün Batımı",
+    "forest": "Orman",
+    "corporate": "Kurumsal",
+    "vibrant": "Canlı"
+  },
+
   "slicer": {
     "searchPlaceholder": "Ara...",
     "clear": "Temizle",
     "configure": "Filtre alanını yapılandırın"
+  },
+
+  "userMgmt": {
+    "title": "Kullanıcı Yönetimi",
+    "subtitle": "Kullanıcıları ekleyin, düzenleyin ve yönetin",
+    "newUser": "Yeni Kullanıcı",
+    "editUser": "Kullanıcı Düzenle",
+    "name": "Ad",
+    "email": "E-posta",
+    "role": "Rol",
+    "status": "Durum",
+    "lastLogin": "Son Giriş",
+    "admin": "Yönetici",
+    "analyst": "Analist",
+    "viewer": "İzleyici",
+    "password": "Şifre",
+    "passwordHint": "En az 8 karakter, büyük/küçük harf ve rakam",
+    "activeUser": "Aktif kullanıcı",
+    "deleteConfirm": "Bu kullanıcı silinsin mi?",
+    "accessDenied": "Erişim Engellendi",
+    "accessDeniedHint": "Bu sayfaya yalnızca yöneticiler erişebilir",
+    "searchPlaceholder": "Kullanıcı ara...",
+    "allRoles": "Tüm Roller",
+    "userCount": "kullanıcı"
   }
 }

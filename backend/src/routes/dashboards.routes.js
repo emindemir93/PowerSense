@@ -204,4 +204,36 @@ router.put('/:id/layout', authenticate, authorize('admin', 'analyst'), async (re
   } catch (err) { next(err); }
 });
 
+router.post('/:id/share', authenticate, authorize('admin', 'analyst'), async (req, res, next) => {
+  try {
+    const dashboard = await db('dashboards').where('id', req.params.id).first();
+    if (!dashboard) return res.status(404).json({ success: false, message: 'Dashboard not found' });
+
+    let shareToken = dashboard.share_token;
+    if (!shareToken) {
+      shareToken = uuidv4().replace(/-/g, '');
+      await db('dashboards').where('id', req.params.id).update({ share_token: shareToken, is_public: true, updated_at: new Date() });
+    }
+
+    res.json({ success: true, data: { shareToken, dashboardId: req.params.id } });
+  } catch (err) { next(err); }
+});
+
+router.delete('/:id/share', authenticate, authorize('admin', 'analyst'), async (req, res, next) => {
+  try {
+    await db('dashboards').where('id', req.params.id).update({ share_token: null, is_public: false, updated_at: new Date() });
+    res.json({ success: true, message: 'Share link disabled' });
+  } catch (err) { next(err); }
+});
+
+router.get('/shared/:token', async (req, res, next) => {
+  try {
+    const dashboard = await db('dashboards').where('share_token', req.params.token).first();
+    if (!dashboard) return res.status(404).json({ success: false, message: 'Dashboard not found' });
+
+    const widgets = await db('widgets').where('dashboard_id', dashboard.id).orderBy('created_at', 'asc');
+    res.json({ success: true, data: { ...dashboard, widgets } });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

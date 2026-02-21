@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   PieChart, Pie, Cell, ScatterChart, Scatter,
@@ -7,7 +7,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { CHART_COLORS, formatNumber, formatAxisValue, formatTableValue, truncateLabel, getConditionalColor } from '../utils/helpers';
+import { formatNumber, formatAxisValue, formatTableValue, truncateLabel, getConditionalColor } from '../utils/helpers';
+import { getThemeColors } from '../utils/themes';
+import { useDashboardStore } from '../store/dashboardStore';
 import { useTranslation } from '../i18n';
 
 const TOOLTIP_STYLE = {
@@ -25,7 +27,26 @@ const AXIS_STYLE = {
 function getDimensionKey(widget) { return widget.data_config?.dimensions?.[0] || 'dim_0'; }
 function getMeasureKeys(widget) { return (widget.data_config?.measures || []).map((m, i) => m.alias || `measure_${i}`); }
 function getMeasureLabels(widget) { return (widget.data_config?.measures || []).map((m) => m.alias || m.field || 'Value'); }
-function getColors(widget) { return widget.visual_config?.colors || CHART_COLORS; }
+function useThemeColors(widget) {
+  const themeId = useDashboardStore((s) => s.dashboardTheme) || 'default';
+  return widget.visual_config?.colors || getThemeColors(themeId);
+}
+
+function CustomTooltip({ active, payload, label, measureLabels }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: '#21262d', border: '1px solid #30363d', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#e6edf3' }}>
+      <div style={{ color: '#8b949e', marginBottom: 4, fontWeight: 500 }}>{label}</div>
+      {payload.filter(p => p.dataKey !== 'base').map((p, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color || p.fill }} />
+          <span style={{ color: '#8b949e' }}>{p.name || measureLabels?.[i] || p.dataKey}:</span>
+          <span style={{ fontWeight: 600 }}>{formatTableValue(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function WidgetRenderer({ widget, data, loading, onCrossFilter, activeCrossFilter }) {
   const { t } = useTranslation();
@@ -56,14 +77,64 @@ export default function WidgetRenderer({ widget, data, loading, onCrossFilter, a
 
 function KPIWidget({ widget, data }) {
   const vc = widget.visual_config || {};
-  const value = data?.[0] ? Object.values(data[0]).find((v) => typeof v === 'number') ?? Object.values(data[0])[0] : 0;
+  const measureKeys = getMeasureKeys(widget);
+  const mKey = measureKeys[0] || null;
+
+  const allValues = useMemo(() => {
+    if (!data?.length || !mKey) return [];
+    return data.map((d) => parseFloat(d[mKey]) || 0);
+  }, [data, mKey]);
+
+  const value = allValues.length > 0 ? allValues[allValues.length - 1] : (data?.[0] ? Object.values(data[0]).find((v) => typeof v === 'number') ?? Object.values(data[0])[0] : 0);
+  const prevValue = allValues.length > 1 ? allValues[allValues.length - 2] : null;
   const condColor = getConditionalColor(value, vc.conditionalRules);
+
+  const change = prevValue !== null && prevValue !== 0 ? ((value - prevValue) / Math.abs(prevValue)) * 100 : null;
+  const isUp = change !== null && change > 0;
+  const isDown = change !== null && change < 0;
+  const trendColor = isUp ? '#3fb950' : isDown ? '#f85149' : '#8b949e';
+
+  const sparkPoints = useMemo(() => {
+    if (allValues.length < 3) return null;
+    const vals = allValues.slice(-12);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const range = max - min || 1;
+    const w = 80, h = 24;
+    return vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ');
+  }, [allValues]);
 
   return (
     <div className="kpi-widget">
       <div className="kpi-value" style={{ color: condColor || vc.color || 'var(--accent)' }}>
         {formatNumber(value, vc.format, vc.prefix, vc.suffix)}
       </div>
+      {change !== null && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 12, fontWeight: 600, color: trendColor }}>
+            {isUp ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            ) : isDown ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            ) : null}
+            {change > 0 ? '+' : ''}{change.toFixed(1)}%
+          </span>
+          {sparkPoints && (
+            <svg width="80" height="24" style={{ flexShrink: 0 }}>
+              <polyline points={sparkPoints} fill="none" stroke={trendColor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+            </svg>
+          )}
+        </div>
+      )}
+      {prevValue !== null && (
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+          {formatNumber(prevValue, vc.format, vc.prefix, vc.suffix)}
+        </div>
+      )}
       <div className="kpi-label">{widget.title}</div>
     </div>
   );
@@ -73,8 +144,9 @@ function BarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
   const dimKey = getDimensionKey(widget);
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
-  const colors = getColors(widget);
+  const colors = useThemeColors(widget);
   const chartData = useMemo(() => data.map((d) => ({ ...d, name: truncateLabel(d[dimKey], 16) })), [data, dimKey]);
+  const showLabels = chartData.length <= 20;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -82,11 +154,12 @@ function BarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
         <CartesianGrid strokeDasharray="3 3" stroke="#21262d" vertical={false} />
         <XAxis dataKey="name" {...AXIS_STYLE} interval={0} angle={chartData.length > 6 ? -35 : 0} textAnchor={chartData.length > 6 ? 'end' : 'middle'} height={chartData.length > 6 ? 60 : 30} />
         <YAxis {...AXIS_STYLE} tickFormatter={formatAxisValue} width={50} />
-        <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
+        <Tooltip content={<CustomTooltip measureLabels={measureLabels} />} />
         {measureKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#8b949e' }} />}
         {measureKeys.map((key, i) => (
           <Bar key={key} dataKey={key} name={measureLabels[i]} fill={colors[i % colors.length]} radius={[3, 3, 0, 0]} cursor="pointer"
             onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d[dimKey])} opacity={activeCrossFilter ? 0.4 : 1}>
+            {showLabels && <LabelList dataKey={key} position="top" fill="#8b949e" fontSize={10} formatter={formatAxisValue} />}
             {activeCrossFilter && chartData.map((entry, idx) => (
               <Cell key={idx} opacity={entry[dimKey] === activeCrossFilter.value ? 1 : 0.4} />
             ))}
@@ -101,8 +174,9 @@ function HBarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
   const dimKey = getDimensionKey(widget);
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
-  const colors = getColors(widget);
+  const colors = useThemeColors(widget);
   const chartData = useMemo(() => data.map((d) => ({ ...d, name: truncateLabel(d[dimKey], 20) })), [data, dimKey]);
+  const showLabels = chartData.length <= 20;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -110,10 +184,11 @@ function HBarChartWidget({ widget, data, onCrossFilter, activeCrossFilter }) {
         <CartesianGrid strokeDasharray="3 3" stroke="#21262d" horizontal={false} />
         <XAxis type="number" {...AXIS_STYLE} tickFormatter={formatAxisValue} />
         <YAxis type="category" dataKey="name" {...AXIS_STYLE} width={100} />
-        <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
+        <Tooltip content={<CustomTooltip measureLabels={measureLabels} />} />
         {measureKeys.map((key, i) => (
           <Bar key={key} dataKey={key} name={measureLabels[i]} fill={colors[i % colors.length]} radius={[0, 3, 3, 0]} cursor="pointer"
             onClick={(d) => onCrossFilter && onCrossFilter(dimKey, d[dimKey])} opacity={activeCrossFilter ? 0.4 : 1}>
+            {showLabels && <LabelList dataKey={key} position="right" fill="#8b949e" fontSize={10} formatter={formatAxisValue} />}
             {activeCrossFilter && chartData.map((entry, idx) => (
               <Cell key={idx} opacity={entry[dimKey] === activeCrossFilter.value ? 1 : 0.4} />
             ))}
@@ -128,8 +203,9 @@ function LineChartWidget({ widget, data }) {
   const dimKey = getDimensionKey(widget);
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
-  const colors = getColors(widget);
+  const colors = useThemeColors(widget);
   const chartData = useMemo(() => data.map((d) => ({ ...d, name: d[dimKey] })), [data, dimKey]);
+  const showLabels = chartData.length <= 20;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -137,11 +213,13 @@ function LineChartWidget({ widget, data }) {
         <CartesianGrid strokeDasharray="3 3" stroke="#21262d" vertical={false} />
         <XAxis dataKey="name" {...AXIS_STYLE} />
         <YAxis {...AXIS_STYLE} tickFormatter={formatAxisValue} width={50} />
-        <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
+        <Tooltip content={<CustomTooltip measureLabels={measureLabels} />} />
         {measureKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#8b949e' }} />}
         {measureKeys.map((key, i) => (
           <Line key={key} type="monotone" dataKey={key} name={measureLabels[i]} stroke={colors[i % colors.length]} strokeWidth={2}
-            dot={{ r: 3, fill: colors[i % colors.length] }} activeDot={{ r: 5 }} />
+            dot={{ r: 3, fill: colors[i % colors.length] }} activeDot={{ r: 5 }}>
+            {showLabels && <LabelList dataKey={key} position="top" fill="#8b949e" fontSize={10} formatter={formatAxisValue} offset={8} />}
+          </Line>
         ))}
       </LineChart>
     </ResponsiveContainer>
@@ -152,8 +230,9 @@ function AreaChartWidget({ widget, data }) {
   const dimKey = getDimensionKey(widget);
   const measureKeys = getMeasureKeys(widget);
   const measureLabels = getMeasureLabels(widget);
-  const colors = getColors(widget);
+  const colors = useThemeColors(widget);
   const chartData = useMemo(() => data.map((d) => ({ ...d, name: d[dimKey] })), [data, dimKey]);
+  const showLabels = chartData.length <= 20;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -169,10 +248,12 @@ function AreaChartWidget({ widget, data }) {
         <CartesianGrid strokeDasharray="3 3" stroke="#21262d" vertical={false} />
         <XAxis dataKey="name" {...AXIS_STYLE} />
         <YAxis {...AXIS_STYLE} tickFormatter={formatAxisValue} width={50} />
-        <Tooltip {...TOOLTIP_STYLE} formatter={(v) => formatAxisValue(v)} />
+        <Tooltip content={<CustomTooltip measureLabels={measureLabels} />} />
         {measureKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, color: '#8b949e' }} />}
         {measureKeys.map((key, i) => (
-          <Area key={key} type="monotone" dataKey={key} name={measureLabels[i]} stroke={colors[i % colors.length]} strokeWidth={2} fill={`url(#grad-${key})`} />
+          <Area key={key} type="monotone" dataKey={key} name={measureLabels[i]} stroke={colors[i % colors.length]} strokeWidth={2} fill={`url(#grad-${key})`}>
+            {showLabels && <LabelList dataKey={key} position="top" fill="#8b949e" fontSize={10} formatter={formatAxisValue} offset={8} />}
+          </Area>
         ))}
       </AreaChart>
     </ResponsiveContainer>
@@ -182,7 +263,7 @@ function AreaChartWidget({ widget, data }) {
 function PieChartWidget({ widget, data, onCrossFilter, innerRadius = 0 }) {
   const dimKey = getDimensionKey(widget);
   const measureKeys = getMeasureKeys(widget);
-  const colors = getColors(widget);
+  const colors = useThemeColors(widget);
   const chartData = useMemo(() => data.map((d) => ({ name: d[dimKey] || 'Unknown', value: parseFloat(d[measureKeys[0]]) || 0, rawDimValue: d[dimKey] })), [data, dimKey, measureKeys]);
   const renderLabel = ({ name, percent }) => `${truncateLabel(name, 12)} ${(percent * 100).toFixed(0)}%`;
 
@@ -204,7 +285,7 @@ function ScatterChartWidget({ widget, data }) {
   const { t } = useTranslation();
   const dims = widget.data_config?.dimensions || [];
   const measures = widget.data_config?.measures || [];
-  const colors = getColors(widget);
+  const colors = useThemeColors(widget);
   const xKey = measures.length >= 2 ? (measures[0].alias || 'measure_0') : '';
   const yKey = measures.length >= 2 ? (measures[1].alias || 'measure_1') : '';
   const dimKey = dims[0] || null;
@@ -233,6 +314,8 @@ function ScatterChartWidget({ widget, data }) {
 function TableWidget({ widget, data }) {
   const condRules = widget.visual_config?.conditionalRules || [];
   const isSql = widget.data_config?.type === 'sql';
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
 
   const columns = useMemo(() => {
     if (isSql && data?.length > 0) {
@@ -252,14 +335,37 @@ function TableWidget({ widget, data }) {
     return cols;
   }, [widget.data_config, data, isSql]);
 
+  const sortedData = useMemo(() => {
+    if (!sortKey) return data;
+    return [...data].sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'asc' ? av - bv : bv - av;
+      return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+  }, [data, sortKey, sortDir]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
   return (
     <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>
       <table className="widget-table">
         <thead>
-          <tr>{columns.map((col) => (<th key={col.key} style={{ textTransform: 'capitalize' }}>{col.label}</th>))}</tr>
+          <tr>{columns.map((col) => (
+            <th key={col.key} onClick={() => handleSort(col.key)} style={{ textTransform: 'capitalize', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+              {col.label}
+              {sortKey === col.key && (
+                <span style={{ marginLeft: 4, fontSize: 10 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
+              )}
+            </th>
+          ))}</tr>
         </thead>
         <tbody>
-          {data.map((row, i) => (
+          {sortedData.map((row, i) => (
             <tr key={i}>
               {columns.map((col) => {
                 const val = row[col.key];
@@ -315,7 +421,7 @@ function GaugeWidget({ widget, data }) {
 function FunnelChartWidget({ widget, data }) {
   const dimKey = getDimensionKey(widget);
   const measureKeys = getMeasureKeys(widget);
-  const colors = getColors(widget);
+  const colors = useThemeColors(widget);
 
   const chartData = useMemo(() =>
     data.map((d, i) => ({
@@ -473,6 +579,8 @@ function RegionMapWidget({ widget, data, onCrossFilter }) {
 function PivotTableWidget({ widget, data }) {
   const { t } = useTranslation();
   const condRules = widget.visual_config?.conditionalRules || [];
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
 
   const { rowDim, colDim, pivotData, colValues, measures: pivotMeasures } = useMemo(() => {
     const dims = widget.data_config?.dimensions || [];
@@ -498,15 +606,44 @@ function PivotTableWidget({ widget, data }) {
     return { rowDim, colDim, pivotData: Object.values(rowMap), colValues, measures };
   }, [data, widget.data_config]);
 
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const sortHeader = (key, label, extraStyle) => (
+    <th key={key} onClick={() => handleSort(key)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', ...extraStyle }}>
+      {label}
+      {sortKey === key && (
+        <span style={{ marginLeft: 4, fontSize: 10 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
+      )}
+    </th>
+  );
+
+  const sortRows = (rows) => {
+    if (!sortKey) return rows;
+    return [...rows].sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'asc' ? av - bv : bv - av;
+      return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+  };
+
   if (!rowDim) return <div className="empty-state"><p style={{ fontSize: 12 }}>{t('widget.pivotRequires')}</p></div>;
 
   if (!colDim) {
+    const sortedData = sortRows(data);
     return (
       <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>
         <table className="widget-table">
-          <thead><tr><th>{rowDim}</th>{pivotMeasures.map((m, i) => <th key={i}>{m.alias || m.field}</th>)}</tr></thead>
+          <thead><tr>
+            {sortHeader(rowDim, rowDim)}
+            {pivotMeasures.map((m, i) => sortHeader(m.alias || `measure_${i}`, m.alias || m.field))}
+          </tr></thead>
           <tbody>
-            {data.map((row, i) => (
+            {sortedData.map((row, i) => (
               <tr key={i}>
                 <td>{row[rowDim] ?? '-'}</td>
                 {pivotMeasures.map((m, mi) => {
@@ -523,18 +660,20 @@ function PivotTableWidget({ widget, data }) {
     );
   }
 
+  const sortedPivotData = sortRows(pivotData);
+
   return (
     <div style={{ overflow: 'auto', width: '100%', height: '100%' }}>
       <table className="widget-table">
         <thead>
           <tr>
-            <th style={{ position: 'sticky', left: 0, background: 'var(--bg-tertiary)', zIndex: 2 }}>{rowDim}</th>
-            {colValues.map((cv) => <th key={cv}>{truncateLabel(cv, 14)}</th>)}
-            <th style={{ fontWeight: 700 }}>{t('common.total')}</th>
+            {sortHeader(rowDim, rowDim, { position: 'sticky', left: 0, background: 'var(--bg-tertiary)', zIndex: 2 })}
+            {colValues.map((cv) => sortHeader(cv, truncateLabel(cv, 14)))}
+            {sortHeader('__total', t('common.total'), { fontWeight: 700 })}
           </tr>
         </thead>
         <tbody>
-          {pivotData.map((row, i) => (
+          {sortedPivotData.map((row, i) => (
             <tr key={i}>
               <td style={{ position: 'sticky', left: 0, background: 'var(--bg-secondary)', zIndex: 1, fontWeight: 500 }}>{row[rowDim]}</td>
               {colValues.map((cv) => {

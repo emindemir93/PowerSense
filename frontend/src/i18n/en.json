@@ -57,7 +57,8 @@
     "userGuide": "User Guide",
     "profile": "Profile",
     "logout": "Logout",
-    "settings": "Settings"
+    "settings": "Settings",
+    "users": "Users"
   },
 
   "login": {
@@ -120,7 +121,37 @@
     "removeWidgetConfirm": "Remove this widget?",
     "drillUp": "Drill Up",
     "resetDrill": "Reset Drill",
-    "drill": "DRILL"
+    "drill": "DRILL",
+    "refresh": "Refresh",
+    "refreshOff": "Auto Off",
+    "justNow": "just now",
+    "ago": "ago",
+    "filters": "Filters",
+    "filterPanel": "Filter Panel",
+    "addFilter": "Add Filter",
+    "filterSource": "Source",
+    "filterField": "Field",
+    "filterOperator": "Operator",
+    "filterValue": "Value",
+    "equals": "Equals",
+    "notEquals": "Not Equals",
+    "contains": "Contains",
+    "greaterThan": "Greater Than",
+    "lessThan": "Less Than",
+    "noFilters": "No active filters",
+    "activeFilters": "Active Filters",
+    "theme": "Theme",
+    "selectTheme": "Select Theme",
+    "share": "Share",
+    "shareTitle": "Share Dashboard",
+    "publicLink": "Public Link",
+    "embedCode": "Embed Code",
+    "qrCode": "QR Code",
+    "copy": "Copy",
+    "scanToView": "Scan to view",
+    "disableSharing": "Disable Sharing",
+    "shareDisabled": "Sharing is disabled",
+    "enableSharing": "Enable Sharing"
   },
 
   "widget": {
@@ -175,7 +206,15 @@
     "selectDimMeasure": "Select dimensions and measures above to configure the chart",
     "noData": "No data available",
     "scatterRequires": "Scatter requires 2+ measures",
-    "pivotRequires": "Pivot needs at least 1 dimension"
+    "pivotRequires": "Pivot needs at least 1 dimension",
+    "appearance": "Appearance",
+    "subtitle": "Subtitle",
+    "subtitlePlaceholder": "Short description...",
+    "descriptionPlaceholder": "Info about this widget...",
+    "titleAlignment": "Title Alignment",
+    "alignLeft": "Left",
+    "alignCenter": "Center",
+    "alignRight": "Right"
   },
 
   "chartTypes": {
@@ -401,9 +440,42 @@
     "languageHint": "Select interface language"
   },
 
+  "themes": {
+    "default": "Default",
+    "ocean": "Ocean",
+    "sunset": "Sunset",
+    "forest": "Forest",
+    "corporate": "Corporate",
+    "vibrant": "Vibrant"
+  },
+
   "slicer": {
     "searchPlaceholder": "Search...",
     "clear": "Clear",
     "configure": "Configure slicer field"
+  },
+
+  "userMgmt": {
+    "title": "User Management",
+    "subtitle": "Add, edit, and manage users",
+    "newUser": "New User",
+    "editUser": "Edit User",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "lastLogin": "Last Login",
+    "admin": "Admin",
+    "analyst": "Analyst",
+    "viewer": "Viewer",
+    "password": "Password",
+    "passwordHint": "Min 8 chars, upper/lower case and number",
+    "activeUser": "Active user",
+    "deleteConfirm": "Delete this user?",
+    "accessDenied": "Access Denied",
+    "accessDeniedHint": "Only administrators can access this page",
+    "searchPlaceholder": "Search users...",
+    "allRoles": "All Roles",
+    "userCount": "users"
   }
 }

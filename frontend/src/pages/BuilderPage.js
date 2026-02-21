@@ -1,14 +1,16 @@
-import React, { useEffect, useCallback, useState, useRef } from 'react';
+import React, { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dashboardsApi, bookmarksApi, commentsApi, alertsApi } from '../services/api';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 import { WIDGET_TYPES } from '../utils/helpers';
+import { DASHBOARD_THEMES } from '../utils/themes';
 import { useTranslation } from '../i18n';
 import DashboardCanvas from '../components/DashboardCanvas';
 import WidgetConfigPanel from '../components/WidgetConfigPanel';
 import FilterBar from '../components/FilterBar';
+import FilterPanel from '../components/FilterPanel';
 
 export default function BuilderPage() {
   const { t } = useTranslation();
@@ -25,17 +27,42 @@ export default function BuilderPage() {
     dateRange, reset, applyBookmark,
   } = useDashboardStore();
 
+  const dashboardTheme = useDashboardStore((s) => s.dashboardTheme);
+  const setDashboardTheme = useDashboardStore((s) => s.setDashboardTheme);
+
+  const [showFilters, setShowFilters] = useState(false);
+  const globalFilters = useDashboardStore((s) => s.globalFilters);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [bookmarkName, setBookmarkName] = useState('');
   const [exporting, setExporting] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [showAlerts, setShowAlerts] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(0);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [showThemes, setShowThemes] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [shareToken, setShareToken] = useState(null);
+  const [copied, setCopied] = useState('');
+
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(timer);
+  }, []);
+  const relativeTime = useMemo(() => {
+    const diff = Math.floor((now - lastRefresh.getTime()) / 1000);
+    if (diff < 10) return t('builder.justNow');
+    if (diff < 60) return `${diff}s ${t('builder.ago')}`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ${t('builder.ago')}`;
+    return `${Math.floor(diff / 3600)}h ${t('builder.ago')}`;
+  }, [now, lastRefresh, t]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', id],
     queryFn: () => dashboardsApi.get(id).then((r) => r.data.data),
     enabled: !!id,
+    staleTime: 0,
   });
 
   const { data: bookmarks, refetch: refetchBookmarks } = useQuery({
@@ -61,9 +88,33 @@ export default function BuilderPage() {
     return () => reset();
   }, [data, setDashboard, reset]);
 
+  useEffect(() => {
+    if (refreshInterval <= 0) return;
+    const timer = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['widget-data'] });
+      setLastRefresh(new Date());
+    }, refreshInterval);
+    return () => clearInterval(timer);
+  }, [refreshInterval, queryClient]);
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['widget-data'] });
+    setLastRefresh(new Date());
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       await dashboardsApi.update(id, { name: dashboard?.name, description: dashboard?.description });
+
+      const serverDash = await dashboardsApi.get(id).then((r) => r.data.data);
+      const serverWidgetIds = (serverDash.widgets || []).map((w) => w.id);
+      const localWidgetIds = widgets.map((w) => w.id);
+
+      const deletedIds = serverWidgetIds.filter((sid) => !localWidgetIds.includes(sid));
+      for (const wid of deletedIds) {
+        await dashboardsApi.deleteWidget(id, wid);
+      }
+
       const layoutPayload = widgets.map((w) => ({ id: w.id, position: w.position }));
       await dashboardsApi.updateLayout(id, layoutPayload);
       for (const w of widgets) {
@@ -72,6 +123,9 @@ export default function BuilderPage() {
           visual_config: w.visual_config, position: w.position,
         });
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard', id] });
     },
   });
 
@@ -103,6 +157,16 @@ export default function BuilderPage() {
   const deleteAlertMutation = useMutation({
     mutationFn: (aId) => alertsApi.delete(aId),
     onSuccess: () => refetchAlerts(),
+  });
+
+  const shareMutation = useMutation({
+    mutationFn: () => dashboardsApi.share(id),
+    onSuccess: (res) => setShareToken(res.data.data.shareToken),
+  });
+
+  const unshareMutation = useMutation({
+    mutationFn: () => dashboardsApi.unshare(id),
+    onSuccess: () => setShareToken(null),
   });
 
   const handleAddWidget = useCallback((widgetType) => {
@@ -200,6 +264,57 @@ export default function BuilderPage() {
           )}
         </div>
         <div className="toolbar-actions">
+          {/* Auto Refresh */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button className="btn btn-ghost btn-icon btn-sm" onClick={handleRefresh} title={t('builder.refresh')} style={{ display: 'flex', alignItems: 'center' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+                <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+              </svg>
+            </button>
+            <select value={refreshInterval} onChange={(e) => setRefreshInterval(Number(e.target.value))}
+              style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px', color: 'var(--text-secondary)', fontSize: 10, cursor: 'pointer' }}>
+              <option value={0}>{t('builder.refreshOff')}</option>
+              <option value={30000}>30s</option>
+              <option value={60000}>1m</option>
+              <option value={300000}>5m</option>
+              <option value={900000}>15m</option>
+              <option value={1800000}>30m</option>
+            </select>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{relativeTime}</span>
+          </div>
+          <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+
+          {/* Theme Selector */}
+          <div style={{ position: 'relative' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowThemes(!showThemes)} title={t('builder.theme')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+                <circle cx="12" cy="12" r="10" /><path d="M12 2a10 10 0 0110 10" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" />
+              </svg>
+              {t('builder.theme')}
+            </button>
+            {showThemes && (
+              <div style={{ position: 'absolute', top: '100%', right: 0, width: 240, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: 8, zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, padding: '0 4px' }}>{t('builder.selectTheme')}</div>
+                {Object.entries(DASHBOARD_THEMES).map(([key, theme]) => (
+                  <div key={key} onClick={() => { setDashboardTheme(key); setShowThemes(false); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px', borderRadius: 6,
+                      cursor: 'pointer', background: dashboardTheme === key ? 'var(--bg-tertiary)' : 'transparent',
+                      border: dashboardTheme === key ? '1px solid var(--accent)' : '1px solid transparent',
+                    }}>
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      {theme.colors.slice(0, 5).map((c, i) => (
+                        <div key={i} style={{ width: 12, height: 12, borderRadius: 2, background: c }} />
+                      ))}
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--text-primary)' }}>{theme.name}</span>
+                    {dashboardTheme === key && <span style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Export buttons */}
           <button className="btn btn-ghost btn-sm" onClick={handleExportPDF} disabled={exporting} title="Export PDF">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
@@ -212,6 +327,13 @@ export default function BuilderPage() {
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             {t('builder.excel')}
+          </button>
+
+          <button className="btn btn-ghost btn-sm" onClick={() => { setShowShare(true); if (!shareToken) shareMutation.mutate(); }} title={t('builder.share')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            {t('builder.share')}
           </button>
 
           {/* Bookmarks */}
@@ -271,6 +393,14 @@ export default function BuilderPage() {
               {alerts?.filter((a) => a.triggered).length > 0 && <span style={{ fontSize: 10, color: 'var(--danger)' }}>{alerts.filter((a) => a.triggered).length}</span>}
             </button>
           )}
+
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowFilters(!showFilters)} title={t('builder.filters')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            {t('builder.filters')}
+            {globalFilters.length > 0 && <span style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 4 }}>{globalFilters.length}</span>}
+          </button>
 
           {editMode && (
             <>
@@ -363,6 +493,70 @@ export default function BuilderPage() {
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
             <AlertManager dashboardId={id} alerts={alerts || []} onDelete={(aId) => deleteAlertMutation.mutate(aId)} onRefresh={refetchAlerts} />
+          </div>
+        </div>
+      )}
+
+      <FilterPanel show={showFilters} onClose={() => setShowFilters(false)} />
+
+      {showShare && (
+        <div className="modal-overlay" onClick={() => setShowShare(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
+            <div className="modal-header">
+              <h2>{t('builder.shareTitle')}</h2>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowShare(false)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+            <div style={{ padding: 16 }}>
+              {shareMutation.isPending ? (
+                <div style={{ textAlign: 'center', padding: 20 }}><div className="loading-spinner" /></div>
+              ) : shareToken ? (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>{t('builder.publicLink')}</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input className="form-input" readOnly value={`${window.location.origin}/shared/${shareToken}`} style={{ flex: 1, fontSize: 11, fontFamily: 'monospace' }} />
+                      <button className="btn btn-primary btn-sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/shared/${shareToken}`); setCopied('link'); setTimeout(() => setCopied(''), 2000); }}>
+                        {copied === 'link' ? t('common.saved') : t('builder.copy')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>{t('builder.embedCode')}</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input className="form-input" readOnly value={`<iframe src="${window.location.origin}/shared/${shareToken}" width="100%" height="600" frameborder="0"></iframe>`} style={{ flex: 1, fontSize: 11, fontFamily: 'monospace' }} />
+                      <button className="btn btn-primary btn-sm" onClick={() => { navigator.clipboard.writeText(`<iframe src="${window.location.origin}/shared/${shareToken}" width="100%" height="600" frameborder="0"></iframe>`); setCopied('embed'); setTimeout(() => setCopied(''), 2000); }}>
+                        {copied === 'embed' ? t('common.saved') : t('builder.copy')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 16, textAlign: 'center' }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'block' }}>{t('builder.qrCode')}</label>
+                    <div style={{ background: '#fff', display: 'inline-block', padding: 16, borderRadius: 8 }}>
+                      <div style={{ width: 120, height: 120, display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 1 }}>
+                        {Array.from({ length: 100 }, (_, i) => {
+                          const hash = (shareToken.charCodeAt(i % shareToken.length) * (i + 1)) % 3;
+                          return <div key={i} style={{ background: hash === 0 ? '#000' : '#fff', borderRadius: 1 }} />;
+                        })}
+                      </div>
+                      <div style={{ fontSize: 8, color: '#666', marginTop: 4 }}>{t('builder.scanToView')}</div>
+                    </div>
+                  </div>
+
+                  <button className="btn btn-ghost btn-sm" style={{ width: '100%', color: 'var(--danger)' }} onClick={() => unshareMutation.mutate()}>
+                    {t('builder.disableSharing')}
+                  </button>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>
+                  <p>{t('builder.shareDisabled')}</p>
+                  <button className="btn btn-primary btn-sm" onClick={() => shareMutation.mutate()}>{t('builder.enableSharing')}</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ import SQLEditorPage from './pages/SQLEditorPage';
 import ConnectionsPage from './pages/ConnectionsPage';
 import UserGuidePage from './pages/UserGuidePage';
 import ProfilePage from './pages/ProfilePage';
+import UserManagementPage from './pages/UserManagementPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="schema" element={<SchemaViewerPage />} />
             <Route path="guide" element={<UserGuidePage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="users" element={<UserManagementPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboards" replace />} />
         </Routes>

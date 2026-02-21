@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useDashboardStore } from '../store/dashboardStore';
 import { queryApi, sqlApi } from '../services/api';
 import { buildQueryPayload, isWidgetConfigured, getDrillHierarchy, aggregateSqlData } from '../utils/helpers';
+import { DASHBOARD_THEMES } from '../utils/themes';
 import WidgetRenderer from './WidgetRenderer';
 import SlicerWidget from './SlicerWidget';
 import { useTranslation } from '../i18n';
@@ -16,6 +17,7 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
   const drillUp = useDashboardStore((s) => s.drillUp);
   const resetDrill = useDashboardStore((s) => s.resetDrill);
   const toggleCrossFilter = useDashboardStore((s) => s.toggleCrossFilter);
+  const globalFilters = useDashboardStore((s) => s.globalFilters);
 
   const effectiveConfig = useMemo(() => {
     if (!drillState?.dimension || !widget.data_config) return widget.data_config;
@@ -26,10 +28,13 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
     };
   }, [widget.data_config, drillState]);
 
-  const queryPayload = useMemo(
-    () => buildQueryPayload(effectiveConfig, crossFilters, dateRange?.from ? dateRange : null),
-    [effectiveConfig, crossFilters, dateRange]
-  );
+  const queryPayload = useMemo(() => {
+    const payload = buildQueryPayload(effectiveConfig, crossFilters, dateRange?.from ? dateRange : null);
+    if (payload && globalFilters.length > 0) {
+      return { ...payload, globalFilters };
+    }
+    return payload;
+  }, [effectiveConfig, crossFilters, dateRange, globalFilters]);
 
   const configured = isWidgetConfigured(widget);
 
@@ -93,8 +98,24 @@ function WidgetContainer({ widget, crossFilters, dateRange, editMode, isSelected
       className={`widget-card ${isSelected ? 'selected' : ''}`}
       onClick={(e) => { if (editMode) { e.stopPropagation(); onSelect(widget.id); } }}
     >
-      <div className="widget-header">
-        <span className="widget-title">{widget.title || t('dashboards.untitled')}</span>
+      <div className="widget-header" style={{ textAlign: widget.visual_config?.titleAlign || 'left' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: widget.visual_config?.titleAlign === 'center' ? 'center' : widget.visual_config?.titleAlign === 'right' ? 'flex-end' : 'flex-start' }}>
+            <span className="widget-title">{widget.title || t('dashboards.untitled')}</span>
+            {widget.visual_config?.description && (
+              <span title={widget.visual_config.description} style={{ cursor: 'help', display: 'inline-flex', color: 'var(--text-muted)' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 12, height: 12 }}>
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+              </span>
+            )}
+          </div>
+          {widget.visual_config?.subtitle && (
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {widget.visual_config.subtitle}
+            </div>
+          )}
+        </div>
         <div className="widget-actions">
           {hasDrillHistory && (
             <button className="btn btn-ghost btn-icon btn-sm" onClick={(e) => { e.stopPropagation(); drillUp(widget.id); }} title={t('builder.drillUp')}>
@@ -163,6 +184,7 @@ export default function DashboardCanvas() {
   const crossFilters = useDashboardStore((s) => s.crossFilters);
   const dateRange = useDashboardStore((s) => s.dateRange);
   const drillStates = useDashboardStore((s) => s.drillStates);
+  const dashboardTheme = useDashboardStore((s) => s.dashboardTheme);
   const updateLayout = useDashboardStore((s) => s.updateLayout);
   const selectWidget = useDashboardStore((s) => s.selectWidget);
   const removeWidget = useDashboardStore((s) => s.removeWidget);
@@ -186,6 +208,8 @@ export default function DashboardCanvas() {
     [editMode, updateLayout]
   );
 
+  const theme = DASHBOARD_THEMES[dashboardTheme] || DASHBOARD_THEMES.default;
+
   const handleDelete = useCallback(
     (id) => { if (window.confirm(t('builder.removeWidgetConfirm'))) removeWidget(id); },
     [removeWidget, t]
@@ -204,7 +228,7 @@ export default function DashboardCanvas() {
   }
 
   return (
-    <div className="dashboard-grid-wrapper" onClick={() => editMode && selectWidget(null)}>
+    <div className="dashboard-grid-wrapper" onClick={() => editMode && selectWidget(null)} style={{ background: theme.bg }}>
       <ResponsiveGridLayout
         className="layout"
         layouts={{ lg: layout }}

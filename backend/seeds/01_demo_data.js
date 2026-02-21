@@ -25,15 +25,11 @@ function randomInt(min, max) {
 }
 
 exports.seed = async (knex) => {
-  // Clear tables
-  await knex('order_items').delete();
-  await knex('orders').delete();
-  await knex('customers').delete();
-  await knex('products').delete();
-  await knex('categories').delete();
-  await knex('audit_logs').delete();
-  await knex('refresh_tokens').delete();
-  await knex('users').delete();
+  const existingUsers = await knex('users').count('* as count').first();
+  if (parseInt(existingUsers.count) > 0) {
+    console.log('⏭️  Seed atlandı: Veriler zaten mevcut');
+    return;
+  }
 
   // ─── Users ─────────────────────────────────────────────────────────────────
   const adminPwd = await bcrypt.hash('Admin123!', 12);

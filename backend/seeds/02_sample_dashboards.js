@@ -1,8 +1,11 @@
 const { v4: uuidv4 } = require('uuid');
 
 exports.seed = async (knex) => {
-  await knex('widgets').delete();
-  await knex('dashboards').delete();
+  const existingDashboards = await knex('dashboards').count('* as count').first();
+  if (parseInt(existingDashboards.count) > 0) {
+    console.log('⏭️  Dashboard seed atlandı: Dashboard\'lar zaten mevcut');
+    return;
+  }
 
   const admin = await knex('users').where('email', 'admin@qlicksense.com').first();
   if (!admin) return;

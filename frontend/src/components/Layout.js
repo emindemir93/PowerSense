@@ -12,6 +12,7 @@ const navIcons = {
   connections: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" /></svg>,
   dbSchema: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h16v3" /><path d="M9 20h6" /><path d="M12 4v16" /><rect x="2" y="7" width="8" height="5" rx="1" /><rect x="14" y="7" width="8" height="5" rx="1" /></svg>,
   userGuide: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
+  users: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>,
 };
 
 const navConfig = [
@@ -21,6 +22,7 @@ const navConfig = [
   { path: '/sql', labelKey: 'nav.sqlEditor', icon: navIcons.sqlEditor },
   { path: '/connections', labelKey: 'nav.connections', icon: navIcons.connections, adminOnly: true },
   { path: '/schema', labelKey: 'nav.dbSchema', icon: navIcons.dbSchema, adminOnly: true },
+  { path: '/users', labelKey: 'nav.users', icon: navIcons.users, adminOnly: true },
   { path: '/guide', labelKey: 'nav.userGuide', icon: navIcons.userGuide },
 ];
 

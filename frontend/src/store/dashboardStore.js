@@ -9,6 +9,8 @@ export const useDashboardStore = create((set) => ({
   dateRange: { from: '', to: '' },
   drillStates: {},
   showAddWidget: false,
+  globalFilters: [],
+  dashboardTheme: 'default',
 
   setDashboard: (dashboard) => set({
     dashboard,
@@ -87,6 +89,13 @@ export const useDashboardStore = create((set) => ({
 
   clearCrossFilters: () => set({ crossFilters: [] }),
 
+  setDashboardTheme: (theme) => set({ dashboardTheme: theme }),
+
+  setGlobalFilters: (filters) => set({ globalFilters: filters }),
+  addGlobalFilter: (filter) => set((state) => ({ globalFilters: [...state.globalFilters, filter] })),
+  removeGlobalFilter: (index) => set((state) => ({ globalFilters: state.globalFilters.filter((_, i) => i !== index) })),
+  clearGlobalFilters: () => set({ globalFilters: [] }),
+
   setDateRange: (dateRange) => set({ dateRange }),
 
   drillDown: (widgetId, dimension, filterField, filterValue) => set((state) => ({
@@ -150,5 +159,7 @@ export const useDashboardStore = create((set) => ({
     dateRange: { from: '', to: '' },
     drillStates: {},
     showAddWidget: false,
+    globalFilters: [],
+    dashboardTheme: 'default',
   }),
 }));

@@ -49,6 +49,9 @@ export default function WidgetConfigPanel({ widget, onClose }) {
   const [slicerField, setSlicerField] = useState(widget?.data_config?.slicerField || '');
   const [conditionalRules, setConditionalRules] = useState(widget?.visual_config?.conditionalRules || []);
   const [gaugeTarget, setGaugeTarget] = useState(widget?.visual_config?.gaugeTarget || 100);
+  const [subtitle, setSubtitle] = useState(widget?.visual_config?.subtitle || '');
+  const [description, setDescription] = useState(widget?.visual_config?.description || '');
+  const [titleAlign, setTitleAlign] = useState(widget?.visual_config?.titleAlign || 'left');
 
   const { data: schema } = useQuery({
     queryKey: ['query-schema'],
@@ -102,6 +105,9 @@ export default function WidgetConfigPanel({ widget, onClose }) {
       setSlicerField(widget.data_config?.slicerField || '');
       setConditionalRules(widget.visual_config?.conditionalRules || []);
       setGaugeTarget(widget.visual_config?.gaugeTarget || 100);
+      setSubtitle(widget.visual_config?.subtitle || '');
+      setDescription(widget.visual_config?.description || '');
+      setTitleAlign(widget.visual_config?.titleAlign || 'left');
     }
   }, [widget]);
 
@@ -146,6 +152,9 @@ export default function WidgetConfigPanel({ widget, onClose }) {
         ...widget.visual_config,
         format,
         prefix,
+        subtitle,
+        description,
+        titleAlign,
         conditionalRules: conditionalRules.length > 0 ? conditionalRules : undefined,
         ...(isGauge && { gaugeTarget: parseFloat(gaugeTarget) || 100 }),
       },
@@ -240,6 +249,30 @@ export default function WidgetConfigPanel({ widget, onClose }) {
             <select className="form-select" value={type} onChange={(e) => setType(e.target.value)}>
               {WIDGET_TYPES.map((t) => (<option key={t.type} value={t.type}>{t.label}</option>))}
             </select>
+          </div>
+        </div>
+
+        {/* Appearance */}
+        <div className="config-section">
+          <div className="config-section-title">{t('widget.appearance')}</div>
+          <div className="form-group">
+            <label className="form-label">{t('widget.subtitle')}</label>
+            <input className="form-input" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder={t('widget.subtitlePlaceholder')} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">{t('widget.description')}</label>
+            <input className="form-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('widget.descriptionPlaceholder')} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">{t('widget.titleAlignment')}</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['left', 'center', 'right'].map((align) => (
+                <button key={align} className={`btn btn-sm ${titleAlign === align ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setTitleAlign(align)} style={{ flex: 1, textTransform: 'capitalize' }}>
+                  {t('widget.align' + align.charAt(0).toUpperCase() + align.slice(1))}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
